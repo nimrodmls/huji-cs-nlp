@@ -51,7 +51,7 @@ def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies
     """
     """
     last_token = None
-    for token_pair in zip([LINE_START] + list(line), list(line[1:]) + [LINE_END]):
+    for idx, token_pair in enumerate(zip([LINE_START] + list(line), list(line) + [LINE_END])):
         ### Unigram handling
         add_token_to_frequencies(get_token_text(token_pair[0]), unigram_frequencies)
 
@@ -68,6 +68,9 @@ def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies
 
         elif is_token_valid(token_pair[0]) and is_token_valid(token_pair[1]):
             add_token_pair_to_frequencies(token_pair, bigram_frequencies)
+        
+        else:
+            pass
 
     ### Unigram - Artificially adding the end token
     add_token_to_frequencies(LINE_END, unigram_frequencies)
