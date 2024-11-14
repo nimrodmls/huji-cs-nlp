@@ -3,6 +3,7 @@ import spacy
 from datasets import load_dataset
 import pickle
 import tqdm
+import random
 
 LINE_START = "[START]"
 LINE_END = "[END]"
@@ -34,8 +35,16 @@ def add_token_pair_to_frequencies(token_pair, frequencies):
     if not is_token_valid(token_pair[0]) or not is_token_valid(token_pair[1]):
         raise ValueError("Both tokens should be valid, got: ", token_pair)
     
-    token_text_pair = (get_token_text(token_pair[0]), get_token_text(token_pair[1]))
-    add_token_to_frequencies(token_text_pair, frequencies)
+    first_token = get_token_text(token_pair[0])
+    second_token = get_token_text(token_pair[1])
+
+    if first_token not in frequencies:
+        frequencies[first_token] = {second_token: 1}
+    else:
+        if second_token not in frequencies[first_token]:
+            frequencies[first_token][second_token] = 1
+        else:
+            frequencies[first_token][second_token] += 1
 
 def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies):
     """
@@ -43,7 +52,7 @@ def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies
     last_token = None
     for token_pair in zip([LINE_START] + list(line), list(line[1:]) + [LINE_END]):
         ### Unigram handling
-        add_token_to_frequencies(token_pair[0], unigram_frequencies)
+        add_token_to_frequencies(get_token_text(token_pair[0]), unigram_frequencies)
 
         ### Bigram handling
         if not is_token_valid(token_pair[1]) and is_token_valid(token_pair[0]):
@@ -59,20 +68,52 @@ def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies
     ### Unigram - Artificially adding the end token
     add_token_to_frequencies(LINE_END, unigram_frequencies)
 
-def main():
+def train_unigram_bigram_models(corpus):
+    """
+    """
     nlp = spacy.load("en_core_web_sm")
-    text = load_dataset('wikitext', 'wikitext-2-raw-v1', split='train')
-    
-    print("Processing token frequencies...")
 
+    # The unigram frequencies will be a dictionary with the token as the 
+    # key and the frequency as the value
     unigram_frequencies = {}
+    # The bigram frequencies will be a dictionary with the first token as the key 
+    # and the value will be another dictionary with the second token as the key 
+    # and the frequency of the pair (first followed by second) as the value
     bigram_frequencies = {}
-    for row in tqdm.tqdm(text['text']):
+    for row in tqdm.tqdm(corpus):
         process_line_token_frequencies(nlp(row), unigram_frequencies, bigram_frequencies)
 
     # For testing, to save time
     pickle.dump(unigram_frequencies, open("unigram_frequencies_dict.p", "wb"))
     pickle.dump(bigram_frequencies, open("bigram_frequencies_dict.p", "wb"))
+
+    return unigram_frequencies, bigram_frequencies
+
+def load_pretrained_models():
+    """
+    """
+    unigram_frequencies = pickle.load(open("unigram_frequencies_dict.p", "rb"))
+    bigram_frequencies = pickle.load(open("bigram_frequencies_dict.p", "rb"))
+
+    return unigram_frequencies, bigram_frequencies
+
+def bigram_predict_next_token(first_token, unigram_frequencies, bigram_frequencies):
+    """
+    """
+    total_occurances = unigram_frequencies[first_token]
+    next_token_chance = random.randint(0, total_occurances)
+    for token, frequency in bigram_frequencies[first_token].items():
+        next_token_chance -= frequency
+        if next_token_chance <= 0:
+            return token
+
+def main():
+    text = load_dataset('wikitext', 'wikitext-2-raw-v1', split='train')
     
+    load_pretrained = True
+
+    print("Processing token frequencies...")
+    unigram_freqs, bigram_freqs = load_pretrained_models() if load_pretrained else train_unigram_bigram_models(text)
+
 if __name__ == "__main__":
     main()  
