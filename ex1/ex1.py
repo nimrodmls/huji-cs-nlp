@@ -56,6 +56,9 @@ def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies
         add_token_to_frequencies(get_token_text(token_pair[0]), unigram_frequencies)
 
         ### Bigram handling
+
+        # If the next token is not valid, we will skip it and keep the last token
+        # until we find a valid token to pair it with
         if not is_token_valid(token_pair[1]) and is_token_valid(token_pair[0]):
             last_token = token_pair[0]
 
@@ -69,9 +72,10 @@ def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies
     ### Unigram - Artificially adding the end token
     add_token_to_frequencies(LINE_END, unigram_frequencies)
 
-def train_unigram_bigram_models(corpus):
+def train_unigram_bigram_models():
     """
     """
+    text = load_dataset('wikitext', 'wikitext-2-raw-v1', split='train')
     nlp = spacy.load("en_core_web_sm")
 
     # The unigram frequencies will be a dictionary with the token as the 
@@ -81,7 +85,7 @@ def train_unigram_bigram_models(corpus):
     # and the value will be another dictionary with the second token as the key 
     # and the frequency of the pair (first followed by second) as the value
     bigram_frequencies = {}
-    for row in tqdm.tqdm(corpus):
+    for row in tqdm.tqdm(text['text']):
         process_line_token_frequencies(nlp(row), unigram_frequencies, bigram_frequencies)
 
     # For testing, to save time
@@ -118,14 +122,12 @@ def bigram_get_next_token_probabilities(first_token, bigram_frequencies):
 
     return probabilities
 
-def main():
-    text = load_dataset('wikitext', 'wikitext-2-raw-v1', split='train')
-    
+def main():    
     ### Loading / Training the models
-    load_pretrained = True
+    load_pretrained = False
 
     print("Processing token frequencies...")
-    unigram_freqs, bigram_freqs = load_pretrained_models() if load_pretrained else train_unigram_bigram_models(text)
+    unigram_freqs, bigram_freqs = load_pretrained_models() if load_pretrained else train_unigram_bigram_models()
 
     ### Testing the models
     probs = bigram_get_next_token_probabilities('in', bigram_freqs)
