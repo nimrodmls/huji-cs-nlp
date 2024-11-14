@@ -134,6 +134,15 @@ def bigram_get_sentence_probability(sentence_tokens, bigram_frequencies):
             return 0
     return prob_log_sum
 
+def compute_perplexity(sentences_tokens, bigram_frequencies):
+    total_log_prob = 0
+    total_tokens = 0
+    for sentence_tokens in sentences_tokens:
+        prob = bigram_get_sentence_probability(sentence_tokens, bigram_frequencies)
+        total_log_prob += prob
+        total_tokens += len(sentence_tokens) + 2  # +2 for the START and sEND token
+    return math.exp(-total_log_prob / total_tokens)
+
 def main():    
     ### Loading / Training the models (Q1)
     nlp = spacy.load("en_core_web_sm")
@@ -159,6 +168,9 @@ def main():
     print(f"Probability of '{sentence_2}': {bigram_get_sentence_probability(sentence_2_tokens, bigram_freqs)}")
 
     ## Q3.2
+    sentences_tokens = [sentence_1_tokens, sentence_2_tokens]
+    perplexity = compute_perplexity(sentences_tokens, bigram_freqs)
+    print(f"Perplexity of both sentences: {perplexity}")
 
     ### Q4
 
