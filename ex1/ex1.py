@@ -93,6 +93,7 @@ def train_unigram_bigram_models(nlp):
 
     return unigram_frequencies, bigram_frequencies
 
+
 def load_pretrained_models():
     """
     """
@@ -134,6 +135,15 @@ def bigram_get_sentence_probability(sentence_tokens, bigram_frequencies):
             return 0
     return prob_log_sum
 
+def unigram_get_token_probability(token, unigram_frequencies, total_unigrams):
+    """
+    """
+    token_text = get_token_text(token)
+    if token_text in unigram_frequencies:
+        return unigram_frequencies[token_text] / total_unigrams
+    else:
+        return 1 / total_unigrams  #unseen tokens
+    
 def compute_perplexity(sentences_tokens, bigram_frequencies):
     total_log_prob = 0
     total_tokens = 0
@@ -142,6 +152,8 @@ def compute_perplexity(sentences_tokens, bigram_frequencies):
         total_log_prob += prob
         total_tokens += len(sentence_tokens) + 2  # +2 for the START and sEND token
     return math.exp(-total_log_prob / total_tokens)
+
+
 
 def main():    
     ### Loading / Training the models (Q1)
@@ -173,6 +185,8 @@ def main():
     print(f"Perplexity of both sentences: {perplexity}")
 
     ### Q4
+    total_unigrams = sum(unigram_freqs.values())
+
 
 
 
