@@ -98,7 +98,7 @@ def load_pretrained_models():
 
     return unigram_frequencies, bigram_frequencies
 
-def bigram_predict_next_token(first_token, unigram_frequencies, bigram_frequencies):
+def bigram_predict_next_token(first_token, bigram_frequencies):
     """
     """
     total_occurances = sum(bigram_frequencies[first_token].values())
@@ -108,7 +108,7 @@ def bigram_predict_next_token(first_token, unigram_frequencies, bigram_frequenci
         if next_token_chance <= 0:
             return token
         
-def bigram_get_next_token_probabilities(first_token, unigram_frequencies, bigram_frequencies):
+def bigram_get_next_token_probabilities(first_token, bigram_frequencies):
     """
     """
     total_occurances = sum(bigram_frequencies[first_token].values())
@@ -128,7 +128,7 @@ def main():
     unigram_freqs, bigram_freqs = load_pretrained_models() if load_pretrained else train_unigram_bigram_models(text)
 
     ### Testing the models
-    probs = bigram_get_next_token_probabilities('in', unigram_freqs, bigram_freqs)
+    probs = bigram_get_next_token_probabilities('in', bigram_freqs)
     print(f"I have a house in {max(probs, key=probs.get)}")
 
 if __name__ == "__main__":
