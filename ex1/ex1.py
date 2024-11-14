@@ -72,11 +72,10 @@ def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies
     ### Unigram - Artificially adding the end token
     add_token_to_frequencies(LINE_END, unigram_frequencies)
 
-def train_unigram_bigram_models():
+def train_unigram_bigram_models(nlp):
     """
     """
     text = load_dataset('wikitext', 'wikitext-2-raw-v1', split='train')
-    nlp = spacy.load("en_core_web_sm")
 
     # The unigram frequencies will be a dictionary with the token as the 
     # key and the frequency as the value
@@ -122,16 +121,48 @@ def bigram_get_next_token_probabilities(first_token, bigram_frequencies):
 
     return probabilities
 
+def bigram_get_sentence_probability(sentence_tokens, bigram_frequencies):
+    """
+    """
+    prob_log_sum = 0
+    for token in zip([LINE_START] + list(sentence_tokens), list(sentence_tokens) + [LINE_END]):
+        probs = bigram_get_next_token_probabilities(get_token_text(token[0]), bigram_frequencies)
+        if token[1] in probs:
+            prob_log_sum += probs[token[1]]
+        else:
+            return 0
+    return prob_log_sum
+
 def main():    
-    ### Loading / Training the models
-    load_pretrained = False
+    ### Loading / Training the models (Q1)
+    nlp = spacy.load("en_core_web_sm")
+    load_pretrained = True
 
     print("Processing token frequencies...")
-    unigram_freqs, bigram_freqs = load_pretrained_models() if load_pretrained else train_unigram_bigram_models()
+    unigram_freqs, bigram_freqs = load_pretrained_models() if load_pretrained else train_unigram_bigram_models(nlp)
 
     ### Testing the models
+
+    ### Q2
     probs = bigram_get_next_token_probabilities('in', bigram_freqs)
     print(f"I have a house in {max(probs, key=probs.get)}")
+
+    ### Q3
+    sentence_1 = "Brad Pitt was born in Oklahoma"
+    sentence_2 = "The actor was born in USA"
+
+    ## Q3.1
+    sentence_1_tokens = nlp(sentence_1)
+    sentence_2_tokens = nlp(sentence_2)
+    print(bigram_get_sentence_probability(sentence_1_tokens, bigram_freqs))
+    print(bigram_get_sentence_probability(sentence_2_tokens, bigram_freqs))
+    
+
+    ## Q3.2
+
+    ### Q4
+
+
 
 if __name__ == "__main__":
     main()  
