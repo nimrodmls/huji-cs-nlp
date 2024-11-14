@@ -127,8 +127,9 @@ def bigram_get_sentence_probability(sentence_tokens, bigram_frequencies):
     prob_log_sum = 0
     for token in zip([LINE_START] + list(sentence_tokens), list(sentence_tokens) + [LINE_END]):
         probs = bigram_get_next_token_probabilities(get_token_text(token[0]), bigram_frequencies)
-        if token[1] in probs:
-            prob_log_sum += probs[token[1]]
+        token2_text = get_token_text(token[1])
+        if token2_text in probs:
+            prob_log_sum += probs[token2_text]
         else:
             return 0
     return prob_log_sum
@@ -154,9 +155,8 @@ def main():
     ## Q3.1
     sentence_1_tokens = nlp(sentence_1)
     sentence_2_tokens = nlp(sentence_2)
-    print(bigram_get_sentence_probability(sentence_1_tokens, bigram_freqs))
-    print(bigram_get_sentence_probability(sentence_2_tokens, bigram_freqs))
-    
+    print(f"Probability of '{sentence_1}': {bigram_get_sentence_probability(sentence_1_tokens, bigram_freqs)}")
+    print(f"Probability of '{sentence_2}': {bigram_get_sentence_probability(sentence_2_tokens, bigram_freqs)}")
 
     ## Q3.2
 
