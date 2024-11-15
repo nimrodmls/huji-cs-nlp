@@ -7,7 +7,6 @@ import random
 import math
 
 LINE_START = "[START]"
-LINE_END = "[END]"
 
 
 def is_token_valid(token):
@@ -15,13 +14,13 @@ def is_token_valid(token):
     Validating whether the token is one we'd like to consider, conditions:
     - Token is not a punctuation mark
     """
-    return (token in [LINE_START, LINE_END]) or token.is_alpha
+    return (token == LINE_START) or token.is_alpha
 
 
 def get_token_text(token):
     """
     """
-    if token in [LINE_START, LINE_END]:
+    if token == LINE_START:
         return token
     return token.lemma_
 
@@ -56,7 +55,12 @@ def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies
     """
     """
     last_token = None
-    for token_pair in zip([LINE_START] + list(line), list(line) + [LINE_END]):
+    line = [token for token in line if is_token_valid(token)]
+    if len(line) == 0:
+        return
+
+    for token_pair in zip([LINE_START] + list(line), list(line)):
+
         ### Unigram handling
         add_token_to_frequencies(get_token_text(token_pair[0]), unigram_frequencies)
 
@@ -73,9 +77,6 @@ def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies
 
         elif is_token_valid(token_pair[0]) and is_token_valid(token_pair[1]):
             add_token_pair_to_frequencies(token_pair, bigram_frequencies)
-
-    ### Unigram - Artificially adding the end token
-    add_token_to_frequencies(LINE_END, unigram_frequencies)
 
 
 def train_unigram_bigram_models(nlp):
@@ -126,7 +127,7 @@ def bigram_get_next_token_probabilities(first_token, bigram_frequencies):
     total_occurances = sum(bigram_frequencies[first_token].values())
     probabilities = {}
     for token, frequency in bigram_frequencies[first_token].items():
-        probabilities[token] = math.log(frequency / total_occurances)
+        probabilities[token] = np.log(frequency / total_occurances)
 
     return probabilities
 
@@ -135,13 +136,13 @@ def bigram_get_sentence_probability(sentence_tokens, bigram_frequencies):
     """
     """
     prob_log_sum = 0
-    for token in zip([LINE_START] + list(sentence_tokens), list(sentence_tokens) + [LINE_END]):
+    for token in zip([LINE_START] + list(sentence_tokens), list(sentence_tokens)):
         probs = bigram_get_next_token_probabilities(get_token_text(token[0]), bigram_frequencies)
         token2_text = get_token_text(token[1])
         if token2_text in probs:
             prob_log_sum += probs[token2_text]
         else:
-            return -float('inf')  # Return -inf for zero probability instead of 0
+            return -np.inf  # Return -inf for zero probability instead of 0
     return prob_log_sum
 
 
@@ -208,7 +209,7 @@ def compute_combined_perplexity(sentences_tokens, unigram_frequencies, bigram_fr
 def main():
     ### Loading / Training the models (Q1)
     nlp = spacy.load("en_core_web_sm")
-    load_pretrained = True
+    load_pretrained = False
 
     print("Processing token frequencies...")
     unigram_freqs, bigram_freqs = load_pretrained_models() if load_pretrained else train_unigram_bigram_models(nlp)
