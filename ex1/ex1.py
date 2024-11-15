@@ -9,12 +9,14 @@ import math
 LINE_START = "[START]"
 LINE_END = "[END]"
 
+
 def is_token_valid(token):
     """
     Validating whether the token is one we'd like to consider, conditions:
     - Token is not a punctuation mark
     """
     return (token in [LINE_START, LINE_END]) or token.is_alpha
+
 
 def get_token_text(token):
     """
@@ -23,11 +25,13 @@ def get_token_text(token):
         return token
     return token.lemma_
 
+
 def add_token_to_frequencies(token, frequencies):
     if token not in frequencies:
         frequencies[token] = 1
     else:
         frequencies[token] += 1
+
 
 def add_token_pair_to_frequencies(token_pair, frequencies):
     """
@@ -35,7 +39,7 @@ def add_token_pair_to_frequencies(token_pair, frequencies):
     # Safety assert - This shouldn't happen
     if not is_token_valid(token_pair[0]) or not is_token_valid(token_pair[1]):
         raise ValueError("Both tokens should be valid, got: ", token_pair)
-    
+
     first_token = get_token_text(token_pair[0])
     second_token = get_token_text(token_pair[1])
 
@@ -46,6 +50,7 @@ def add_token_pair_to_frequencies(token_pair, frequencies):
             frequencies[first_token][second_token] = 1
         else:
             frequencies[first_token][second_token] += 1
+
 
 def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies):
     """
@@ -71,6 +76,7 @@ def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies
 
     ### Unigram - Artificially adding the end token
     add_token_to_frequencies(LINE_END, unigram_frequencies)
+
 
 def train_unigram_bigram_models(nlp):
     """
@@ -102,6 +108,7 @@ def load_pretrained_models():
 
     return unigram_frequencies, bigram_frequencies
 
+
 def bigram_predict_next_token(first_token, bigram_frequencies):
     """
     """
@@ -111,7 +118,8 @@ def bigram_predict_next_token(first_token, bigram_frequencies):
         next_token_chance -= frequency
         if next_token_chance <= 0:
             return token
-        
+
+
 def bigram_get_next_token_probabilities(first_token, bigram_frequencies):
     """
     """
@@ -121,6 +129,7 @@ def bigram_get_next_token_probabilities(first_token, bigram_frequencies):
         probabilities[token] = math.log(frequency / total_occurances)
 
     return probabilities
+
 
 def bigram_get_sentence_probability(sentence_tokens, bigram_frequencies):
     """
@@ -132,8 +141,9 @@ def bigram_get_sentence_probability(sentence_tokens, bigram_frequencies):
         if token2_text in probs:
             prob_log_sum += probs[token2_text]
         else:
-            return 0
+            return -float('inf')  # Return -inf for zero probability instead of 0
     return prob_log_sum
+
 
 def unigram_get_token_probability(token, unigram_frequencies, total_unigrams):
     """
@@ -143,19 +153,59 @@ def unigram_get_token_probability(token, unigram_frequencies, total_unigrams):
         return unigram_frequencies[token_text] / total_unigrams
     else:
         return 1 / total_unigrams  #unseen tokens
-    
+
+
+def unigram_get_sentence_probability(sentence_tokens, unigram_frequencies):
+    """
+    """
+    total_log_prob = 0
+
+    # Total number of tokens in the unigram model (to compute probabilities)
+    total_unigrams = sum(unigram_frequencies.values())
+
+    # Add probabilities for each token in the sentence (including start and end tokens)
+    for token in [LINE_START] + list(sentence_tokens) + [LINE_END]:
+        token_text = get_token_text(token)  # Get the text representation of the token
+        unigram_count = unigram_frequencies.get(token_text, 0)
+        unigram_prob = unigram_count / total_unigrams if unigram_count > 0 else 0
+        if unigram_prob == 0:
+            total_log_prob += -float('inf')
+        else:
+            total_log_prob += math.log(unigram_prob)
+    return total_log_prob
+
+
 def compute_perplexity(sentences_tokens, bigram_frequencies):
     total_log_prob = 0
     total_tokens = 0
     for sentence_tokens in sentences_tokens:
         prob = bigram_get_sentence_probability(sentence_tokens, bigram_frequencies)
         total_log_prob += prob
-        total_tokens += len(sentence_tokens) + 2  # +2 for the START and sEND token
+        total_tokens += len(sentence_tokens) + 2  # +2 for the START and END token
     return math.exp(-total_log_prob / total_tokens)
 
 
+def combined_get_sentence_probability(sentence_tokens, unigram_frequencies, bigram_frequencies, lambda_bigram, lambda_unigram):
+    """
+    """
+    unigram_log_prob = unigram_get_sentence_probability(sentence_tokens, unigram_frequencies)
+    bigram_log_prob = bigram_get_sentence_probability(sentence_tokens, bigram_frequencies)
+    combined_log_prob = lambda_bigram * bigram_log_prob + lambda_unigram * unigram_log_prob
+    return combined_log_prob
 
-def main():    
+def compute_combined_perplexity(sentences_tokens, unigram_frequencies, bigram_frequencies, lambda_bigram=2/3, lambda_unigram=1/3):
+    total_log_prob = 0
+    total_tokens = 0
+    for tokens in sentences_tokens:
+        prob = combined_get_sentence_probability(tokens, unigram_frequencies, bigram_frequencies, lambda_bigram, lambda_unigram)
+        if prob == -float('inf'):
+            return float('inf')
+        total_log_prob += prob
+        total_tokens += len(tokens) + 2  # +1 for START and the END token
+    return math.exp(-total_log_prob / total_tokens)
+
+
+def main():
     ### Loading / Training the models (Q1)
     nlp = spacy.load("en_core_web_sm")
     load_pretrained = True
@@ -167,7 +217,9 @@ def main():
 
     ### Q2
     probs = bigram_get_next_token_probabilities('in', bigram_freqs)
+    print("Q2:")
     print(f"I have a house in {max(probs, key=probs.get)}")
+    print()
 
     ### Q3
     sentence_1 = "Brad Pitt was born in Oklahoma"
@@ -176,19 +228,25 @@ def main():
     ## Q3.1
     sentence_1_tokens = nlp(sentence_1)
     sentence_2_tokens = nlp(sentence_2)
+    print("Q3")
     print(f"Probability of '{sentence_1}': {bigram_get_sentence_probability(sentence_1_tokens, bigram_freqs)}")
     print(f"Probability of '{sentence_2}': {bigram_get_sentence_probability(sentence_2_tokens, bigram_freqs)}")
+
 
     ## Q3.2
     sentences_tokens = [sentence_1_tokens, sentence_2_tokens]
     perplexity = compute_perplexity(sentences_tokens, bigram_freqs)
     print(f"Perplexity of both sentences: {perplexity}")
+    print()
 
     ### Q4
-    total_unigrams = sum(unigram_freqs.values())
-
-
-
+    sentences_tokens = [sentence_1_tokens, sentence_2_tokens]
+    lambda_bigram = 2 / 3
+    lambda_unigram = 1 / 3
+    print("Q4")
+    print(f"Probability of '{sentence_1}': {combined_get_sentence_probability(sentence_1_tokens,unigram_freqs,bigram_freqs,lambda_bigram, lambda_unigram)}")
+    print(f"Probability of '{sentence_2}': {combined_get_sentence_probability(sentence_2_tokens,unigram_freqs,bigram_freqs,lambda_bigram, lambda_unigram)}")
+    print(f"Perplexity of both sentences: {compute_combined_perplexity(sentences_tokens,unigram_freqs,bigram_freqs,lambda_bigram, lambda_unigram)}")
 
 if __name__ == "__main__":
-    main()  
+    main()
