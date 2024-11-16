@@ -146,35 +146,6 @@ def bigram_get_sentence_probability(sentence_tokens, bigram_frequencies):
     return prob_log_sum
 
 
-def unigram_get_token_probability(token, unigram_frequencies, total_unigrams):
-    """
-    """
-    token_text = get_token_text(token)
-    if token_text in unigram_frequencies:
-        return unigram_frequencies[token_text] / total_unigrams
-    else:
-        return 1 / total_unigrams  #unseen tokens
-
-
-def unigram_get_sentence_probability(sentence_tokens, unigram_frequencies):
-    """
-    """
-    total_log_prob = 0
-
-    # Total number of tokens in the unigram model (to compute probabilities)
-    total_unigrams = sum(unigram_frequencies.values())
-
-    # Add probabilities for each token in the sentence (including start and end tokens)
-    for token in [LINE_START] + list(sentence_tokens) + [LINE_END]:
-        token_text = get_token_text(token)  # Get the text representation of the token
-        unigram_count = unigram_frequencies.get(token_text, 0)
-        unigram_prob = unigram_count / total_unigrams if unigram_count > 0 else 0
-        if unigram_prob == 0:
-            total_log_prob += -float('inf')
-        else:
-            total_log_prob += math.log(unigram_prob)
-    return total_log_prob
-
 
 def compute_perplexity(sentences_tokens, bigram_frequencies):
     total_log_prob = 0
@@ -182,27 +153,63 @@ def compute_perplexity(sentences_tokens, bigram_frequencies):
     for sentence_tokens in sentences_tokens:
         prob = bigram_get_sentence_probability(sentence_tokens, bigram_frequencies)
         total_log_prob += prob
-        total_tokens += len(sentence_tokens) + 2  # +2 for the START and END token
+        total_tokens += len(sentence_tokens)
     return math.exp(-total_log_prob / total_tokens)
 
 
 def combined_get_sentence_probability(sentence_tokens, unigram_frequencies, bigram_frequencies, lambda_bigram, lambda_unigram):
     """
     """
-    unigram_log_prob = unigram_get_sentence_probability(sentence_tokens, unigram_frequencies)
-    bigram_log_prob = bigram_get_sentence_probability(sentence_tokens, bigram_frequencies)
-    combined_log_prob = lambda_bigram * bigram_log_prob + lambda_unigram * unigram_log_prob
-    return combined_log_prob
+    total_log_prob = 0
+    total_unigrams = sum(unigram_frequencies.values())
 
-def compute_combined_perplexity(sentences_tokens, unigram_frequencies, bigram_frequencies, lambda_bigram=2/3, lambda_unigram=1/3):
+    for token_pair in zip([LINE_START] + list(sentence_tokens), list(sentence_tokens)):
+        first_token = get_token_text(token_pair[0])
+        second_token = get_token_text(token_pair[1])
+
+        # Unigram probability
+        unigram_count = unigram_frequencies.get(second_token, 0)
+        unigram_prob = unigram_count / total_unigrams
+
+        #Bigram probability
+        if first_token in bigram_frequencies and second_token in bigram_frequencies[first_token]:
+            bigram_count = bigram_frequencies[first_token][second_token]
+            total_bigram_count = sum(bigram_frequencies[first_token].values())
+            bigram_prob = bigram_count / total_bigram_count
+        else:
+            bigram_prob = 0
+
+        # Combined probability using the weighted sum of unigram and bigram probabilities
+        combined_prob = lambda_bigram * bigram_prob + lambda_unigram * unigram_prob
+
+        # Apply log if combined probability is greater than 0, else use -inf for zero probability
+        if combined_prob > 0:
+            total_log_prob += math.log(combined_prob)
+        else:
+            return -np.inf
+
+    return total_log_prob
+
+
+def compute_combined_perplexity(sentences_tokens, unigram_frequencies, bigram_frequencies, lambda_bigram=2 / 3,
+                                lambda_unigram=1 / 3):
     total_log_prob = 0
     total_tokens = 0
-    for tokens in sentences_tokens:
-        prob = combined_get_sentence_probability(tokens, unigram_frequencies, bigram_frequencies, lambda_bigram, lambda_unigram)
-        if prob == -float('inf'):
+
+    for sentence_tokens in sentences_tokens:
+        prob_log_sum = combined_get_sentence_probability(
+            sentence_tokens,
+            unigram_frequencies,
+            bigram_frequencies,
+            lambda_bigram,
+            lambda_unigram
+        )
+        if prob_log_sum == -np.inf:
             return float('inf')
-        total_log_prob += prob
-        total_tokens += len(tokens) + 2  # +1 for START and the END token
+
+        total_log_prob += prob_log_sum
+        total_tokens += len(sentence_tokens)
+
     return math.exp(-total_log_prob / total_tokens)
 
 
