@@ -64,20 +64,11 @@ def process_line_token_frequencies(line, unigram_frequencies, bigram_frequencies
         ### Unigram handling
         add_token_to_frequencies(get_token_text(token_pair[0]), unigram_frequencies)
 
-        ### Bigram handling
+        add_token_pair_to_frequencies(token_pair, bigram_frequencies)
 
-        # If the next token is not valid, we will skip it and keep the last token
-        # until we find a valid token to pair it with
-        if not is_token_valid(token_pair[1]) and is_token_valid(token_pair[0]):
-            last_token = token_pair[0]
-
-        elif not is_token_valid(token_pair[0]) and is_token_valid(token_pair[1]) and last_token is not None:
-            add_token_pair_to_frequencies((last_token, token_pair[1]), bigram_frequencies)
-            last_token = None
-
-        elif is_token_valid(token_pair[0]) and is_token_valid(token_pair[1]):
-            add_token_pair_to_frequencies(token_pair, bigram_frequencies)
-
+    # Adding last token to unigram
+    add_token_to_frequencies(get_token_text(line[-1]), unigram_frequencies)
+    
 
 def train_unigram_bigram_models(nlp):
     """
@@ -232,10 +223,10 @@ def main():
     ### Q3
     sentence_1 = "Brad Pitt was born in Oklahoma"
     sentence_2 = "The actor was born in USA"
-
-    ## Q3.1
     sentence_1_tokens = nlp(sentence_1)
     sentence_2_tokens = nlp(sentence_2)
+
+    ## Q3.1
     print("Q3")
     print(f"Probability of '{sentence_1}': {bigram_get_sentence_probability(sentence_1_tokens, bigram_freqs)}")
     print(f"Probability of '{sentence_2}': {bigram_get_sentence_probability(sentence_2_tokens, bigram_freqs)}")
