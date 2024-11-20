@@ -3,7 +3,6 @@ import spacy
 from datasets import load_dataset
 import pickle
 import tqdm
-import random
 import math
 
 LINE_START = "[START]"
@@ -101,17 +100,6 @@ def load_pretrained_models():
     return unigram_frequencies, bigram_frequencies
 
 
-def bigram_predict_next_token(first_token, bigram_frequencies):
-    """
-    """
-    total_occurances = sum(bigram_frequencies[first_token].values())
-    next_token_chance = random.randint(0, total_occurances)
-    for token, frequency in bigram_frequencies[first_token].items():
-        next_token_chance -= frequency
-        if next_token_chance <= 0:
-            return token
-
-
 def bigram_get_next_token_probabilities(first_token, bigram_frequencies):
     """
     """
@@ -207,7 +195,7 @@ def compute_combined_perplexity(sentences_tokens, unigram_frequencies, bigram_fr
 def main():
     ### Loading / Training the models (Q1)
     nlp = spacy.load("en_core_web_sm")
-    load_pretrained = False
+    load_pretrained = False # On True, a pretrained model will be read, otherwise, train & save
 
     print("Processing token frequencies...")
     unigram_freqs, bigram_freqs = load_pretrained_models() if load_pretrained else train_unigram_bigram_models(nlp)
