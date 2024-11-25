@@ -4,7 +4,12 @@
 # Exercise 2 - Natural Language Processing 67658  #
 ###################################################
 
+from tqdm import tqdm
 import numpy as np
+import torch
+import torch.nn as nn
+import matplotlib.pyplot as plt
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 # subset of categories that we will use
 category_dict = {'comp.graphics': 'computer graphics',
@@ -41,6 +46,74 @@ def get_data(categories=None, portion=1.):
     x_test, y_test = x_test[non_empty].tolist(), y_test[non_empty].tolist()
     return x_train, y_train, x_test, y_test
 
+def generate_datasets(portion, batch_size=32):
+    """
+    """
+    x_train, y_train, x_test, y_test = get_data(categories=category_dict.keys(), portion=portion)
+    vectorizer = TfidfVectorizer(max_features=2000)
+
+    x_train = vectorizer.fit_transform(x_train).toarray()
+    trainset = torch.utils.data.TensorDataset(
+        torch.tensor(x_train).float(), torch.tensor(y_train).long())
+    trainloader = torch.utils.data.DataLoader(
+        trainset, batch_size=batch_size)
+    
+    x_test = vectorizer.transform(x_test).toarray()
+    testset = torch.utils.data.TensorDataset(
+        torch.tensor(x_test).float(), torch.tensor(y_test).long())
+    testloader = torch.utils.data.DataLoader(
+        testset, batch_size=batch_size)
+
+    return trainloader, testloader
+
+def train_model(model, trainloader, epochs=10, lr=0.01):
+    """
+    Training the model on the training set.
+    :param model: The model to train.
+    :param trainloader: The training set.
+    :param test_loader: The testing set.
+    :param epochs: The number of epochs to train the model.
+    :param lr: The learning rate for the optimizer.
+    :return: The losses and accuracies of the model during training, for each epoch.
+    """
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+
+    criterion = torch.nn.CrossEntropyLoss().to(device)
+    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+
+    losses = []
+    accuracies = []
+
+    for ep in range(epochs):
+
+        print(f'[TRAIN] Epoch: {ep + 1}')
+        model.train()
+        pred_correct = 0
+        ep_loss = 0.
+
+        for i, (inputs, labels) in enumerate(tqdm(trainloader)):
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            
+            pred_correct += (outputs.argmax(dim=1) == labels).sum().item()
+            ep_loss += loss.item()
+
+        accuracies.append(pred_correct / len(trainloader.dataset))
+        losses.append(ep_loss / len(trainloader))
+
+    print('[TRAIN] Final Loss: ', losses[-1])
+    print('[TRAIN] Final Accuracy: ', accuracies[-1])
+
+    return losses, accuracies
 
 # Q1,2
 def MLP_classification(portion=1., model=None):
@@ -49,12 +122,23 @@ def MLP_classification(portion=1., model=None):
     :param portion: portion of the data to use
     :return: classification accuracy
     """
-    from sklearn.feature_extraction.text import TfidfVectorizer
-    x_train, y_train, x_test, y_test = get_data(categories=category_dict.keys(), portion=portion)
+    trainloader, testloader = generate_datasets(portion)
+    model = nn.Linear(2000, 4)
+    losses, accuracies = train_model(model, trainloader, epochs=10, lr=0.1)
+    
+    plt.plot(accuracies, label='Train')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Train Accuracy')
+    plt.show()
+    plt.close()
 
-    ########### add your code here ###########
-    return
-
+    plt.plot(losses, label='Train')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Train Loss')
+    plt.show()
+    plt.close()
 
 # Q3
 def transformer_classification(portion=1.):
@@ -135,13 +219,13 @@ def transformer_classification(portion=1.):
 if __name__ == "__main__":
     portions = [0.1, 0.2, 0.5, 1.]
     # Q1 - single layer MLP
-    pass
+    MLP_classification()
 
     # Q2 - multi-layer MLP
     pass
 
     # Q3 - Transformer
-    print("\nTransformer results:")
-    for p in portions[:2]:
-        print(f"Portion: {p}")
-        transformer_classification(portion=p)
+    # print("\nTransformer results:")
+    # for p in portions[:2]:
+    #     print(f"Portion: {p}")
+    #     transformer_classification(portion=p)
