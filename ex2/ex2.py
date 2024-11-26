@@ -198,6 +198,8 @@ def transformer_classification(portion=1.):
         :param dev:
         :return: Average loss over the epoch
         """
+        criterion = torch.nn.CrossEntropyLoss().to(dev)
+
         model.train()
         total_loss = 0.
         # iterate over batches
@@ -205,17 +207,28 @@ def transformer_classification(portion=1.):
             input_ids = batch['input_ids'].to(dev)
             attention_mask = batch['attention_mask'].to(dev)
             labels = batch['labels'].to(dev)
-            ########### add your code here ###########
-        return
+
+            optimizer.zero_grad()
+            outputs = model(input_ids, attention_mask=attention_mask)
+            loss = criterion(outputs.logits, labels)
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+        
+        return total_loss / len(data_loader)
 
     def evaluate_model(model, data_loader, dev='cpu', metric=None):
         model.eval()
         for batch in tqdm(data_loader):
-            input_ids = batch['input_ids'].to(dev)
-            attention_mask = batch['attention_mask'].to(dev)
-            labels = batch['labels'].to(dev)
-            ########### add your code here ###########
-        return
+            with torch.no_grad():
+                input_ids = batch['input_ids'].to(dev)
+                attention_mask = batch['attention_mask'].to(dev)
+                labels = batch['labels'].to(dev)
+                
+                outputs = model(input_ids, attention_mask=attention_mask)
+                if metric is not None:
+                    metric.add_batch(predictions=outputs.logits, references=labels)
 
     x_train, y_train, x_test, y_test = get_data(categories=category_dict.keys(), portion=portion)
 
@@ -227,7 +240,8 @@ def transformer_classification(portion=1.):
     learning_rate = 5e-5
 
     # Model, tokenizer, and metric
-    model = AutoModelForSequenceClassification.from_pretrained('distilroberta-base', num_labels=num_labels).to(dev)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        'distilroberta-base', num_labels=num_labels).to(dev)
     tokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
     metric = evaluate.load("accuracy")
 
@@ -237,8 +251,33 @@ def transformer_classification(portion=1.):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size)
 
-    ########### add your code here ###########
-    return
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+
+    val_accuracy = []
+    train_loss = []
+
+    for epoch in range(epochs):
+        print(f"[TRAIN] Epoch: {epoch + 1}")
+
+        loss = train_epoch(model, train_loader, optimizer, dev)
+        train_loss.append(loss)
+
+        evaluate_model(model, val_loader, dev, metric)
+        val_accuracy.append(metric.compute())
+
+    plt.plot(train_loss)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Train Loss')
+    plt.savefig('transformer_loss.png')
+    plt.close()
+
+    plt.plot(val_accuracy)
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Test Accuracy')
+    plt.savefig('transformer_accuracy.png')
+    plt.close()
 
 def q1(portions):
     """
@@ -263,13 +302,13 @@ def q2(portions):
 if __name__ == "__main__":
     portions = [0.1, 0.2, 0.5, 1.]
     # Q1 - single layer MLP
-    q1(portions)
+    # q1(portions)
 
     # Q2 - multi-layer MLP
     #q2(portions)
 
     # Q3 - Transformer
-    # print("\nTransformer results:")
-    # for p in portions[:2]:
-    #     print(f"Portion: {p}")
-    #     transformer_classification(portion=p)
+    print("\nTransformer results:")
+    for p in portions[:2]:
+        print(f"Portion: {p}")
+        transformer_classification(portion=p)
