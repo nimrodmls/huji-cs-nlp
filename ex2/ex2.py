@@ -66,7 +66,29 @@ def generate_datasets(portion, batch_size=32):
 
     return trainloader, testloader
 
-def train_model(model, trainloader, epochs=10, lr=0.01):
+def test_model(model, testloader):
+    """
+    """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+
+    print('[TEST] Starting evaluation...')
+    model.eval()
+    with torch.no_grad():
+        pred_correct = 0
+        
+        for i, (inputs, labels) in enumerate(tqdm(testloader)):
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            outputs = model(inputs)
+
+            pred_correct += (outputs.argmax(dim=1) == labels).sum().item()
+
+        accuracy = pred_correct / len(testloader.dataset)
+        
+        return accuracy
+
+def train_model(model, trainloader, testloader, epochs=10, lr=0.01):
     """
     Training the model on the training set.
     :param model: The model to train.
@@ -81,10 +103,11 @@ def train_model(model, trainloader, epochs=10, lr=0.01):
     model.to(device)
 
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     losses = []
     accuracies = []
+    test_accuracies = []
 
     for ep in range(epochs):
 
@@ -103,40 +126,42 @@ def train_model(model, trainloader, epochs=10, lr=0.01):
             loss.backward()
             optimizer.step()
 
-            
             pred_correct += (outputs.argmax(dim=1) == labels).sum().item()
             ep_loss += loss.item()
+
+        test_accuracies.append(test_model(model, testloader))
 
         accuracies.append(pred_correct / len(trainloader.dataset))
         losses.append(ep_loss / len(trainloader))
 
-    print('[TRAIN] Final Loss: ', losses[-1])
-    print('[TRAIN] Final Accuracy: ', accuracies[-1])
+    print('[TRAIN] Final Train Loss: ', losses[-1])
+    print('[TRAIN] Final Train Accuracy: ', accuracies[-1])
+    print('[TRAIN] Final Validation Accuracy: ', test_accuracies[-1])
 
-    return losses, accuracies
+    return losses, accuracies, test_accuracies
 
 # Q1,2
-def MLP_classification(portion=1., model=None):
+def MLP_classification(model, lr=0.01, portion=1.):
     """
     Perform linear classification
     :param portion: portion of the data to use
     :return: classification accuracy
     """
     trainloader, testloader = generate_datasets(portion)
-    model = nn.Linear(2000, 4)
-    losses, accuracies = train_model(model, trainloader, epochs=10, lr=0.1)
-    
-    plt.plot(accuracies, label='Train')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.title('Train Accuracy')
-    plt.show()
-    plt.close()
+    train_losses, train_accuracies, test_accuracies = \
+        train_model(model, trainloader, testloader, epochs=10, lr=lr)
 
-    plt.plot(losses, label='Train')
+    plt.plot(train_losses)
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Train Loss')
+    plt.show()
+    plt.close()
+
+    plt.plot(test_accuracies)
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Test Accuracy')
     plt.show()
     plt.close()
 
@@ -215,14 +240,33 @@ def transformer_classification(portion=1.):
     ########### add your code here ###########
     return
 
+def q1(portions):
+    """
+    """
+    for p in portions:
+        print(f"\nMLP results for portion {p}:")
+        model = nn.Sequential(nn.Linear(2000, 4), nn.Softmax(dim=1))
+        MLP_classification(model, portion=p)
+
+def q2(portions):
+    """
+    """
+    for p in portions:
+        print(f"\nMLP results for portion {p}:")
+        model = nn.Sequential(
+            nn.Linear(2000, 500),
+            nn.ReLU(),
+            nn.Linear(500, 4),
+            nn.Softmax(dim=1))
+        MLP_classification(model, portion=p)
 
 if __name__ == "__main__":
     portions = [0.1, 0.2, 0.5, 1.]
     # Q1 - single layer MLP
-    MLP_classification()
+    q1(portions)
 
     # Q2 - multi-layer MLP
-    pass
+    #q2(portions)
 
     # Q3 - Transformer
     # print("\nTransformer results:")
