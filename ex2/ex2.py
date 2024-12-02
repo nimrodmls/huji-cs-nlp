@@ -18,6 +18,36 @@ category_dict = {'comp.graphics': 'computer graphics',
                  'talk.politics.guns': 'politics, guns'
                  }
 
+class LogLinearClassifier(nn.Module):
+
+    def __init__(self, input_dim, output_dim):
+        super(LogLinearClassifier, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(input_dim, output_dim), 
+            nn.Softmax(dim=1))
+
+    def forward(self, x):
+        return self.model(x)
+    
+    def name(self):
+        return "LogLinearModel"
+    
+class MLPClassifier(nn.Module):
+
+    def __init__(self, input_dim, hidden_dim, output_dim):
+        super(MLPClassifier, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, output_dim),
+            nn.Softmax(dim=1))
+
+    def forward(self, x):
+        return self.model(x)
+    
+    def name(self):
+        return "MLPClassifier"
+
 def get_data(categories=None, portion=1.):
     """
     Get data for given categories and portion
@@ -56,7 +86,7 @@ def generate_datasets(portion, batch_size=32):
     trainset = torch.utils.data.TensorDataset(
         torch.tensor(x_train).float(), torch.tensor(y_train).long())
     trainloader = torch.utils.data.DataLoader(
-        trainset, batch_size=batch_size)
+        trainset, batch_size=batch_size, shuffle=True)
     
     x_test = vectorizer.transform(x_test).toarray()
     testset = torch.utils.data.TensorDataset(
@@ -134,36 +164,34 @@ def train_model(model, trainloader, testloader, epochs=10, lr=0.01):
         accuracies.append(pred_correct / len(trainloader.dataset))
         losses.append(ep_loss / len(trainloader))
 
-    print('[TRAIN] Final Train Loss: ', losses[-1])
-    print('[TRAIN] Final Train Accuracy: ', accuracies[-1])
-    print('[TRAIN] Final Validation Accuracy: ', test_accuracies[-1])
-
     return losses, accuracies, test_accuracies
 
 # Q1,2
-def MLP_classification(model, lr=0.01, portion=1.):
+def MLP_classification(model, batch_size, epochs, lr, portion):
     """
     Perform linear classification
     :param portion: portion of the data to use
     :return: classification accuracy
     """
-    trainloader, testloader = generate_datasets(portion)
+    trainloader, testloader = generate_datasets(portion, batch_size)
     train_losses, train_accuracies, test_accuracies = \
-        train_model(model, trainloader, testloader, epochs=10, lr=lr)
+        train_model(model, trainloader, testloader, epochs=epochs, lr=lr)
 
     plt.plot(train_losses)
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Train Loss')
-    plt.show()
+    plt.title(f'Train Loss - {model.name()}')
+    plt.savefig(f'{model.name()}_loss_portion_{portion}.png')
     plt.close()
 
     plt.plot(test_accuracies)
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
-    plt.title('Test Accuracy')
-    plt.show()
+    plt.title(f'Test Accuracy - {model.name()}')
+    plt.savefig(f'{model.name()}_accuracy_portion_{portion}.png')
     plt.close()
+
+    return train_losses[-1], test_accuracies[-1]
 
 # Q3
 def transformer_classification(portion=1.):
@@ -228,7 +256,7 @@ def transformer_classification(portion=1.):
                 
                 outputs = model(input_ids, attention_mask=attention_mask)
                 if metric is not None:
-                    metric.add_batch(predictions=outputs.logits, references=labels)
+                    metric.add_batch(predictions=nn.functional.softmax(outputs.logits, dim=1).argmax(dim=1), references=labels)
 
     x_train, y_train, x_test, y_test = get_data(categories=category_dict.keys(), portion=portion)
 
@@ -244,6 +272,8 @@ def transformer_classification(portion=1.):
         'distilroberta-base', num_labels=num_labels).to(dev)
     tokenizer = AutoTokenizer.from_pretrained('distilroberta-base')
     metric = evaluate.load("accuracy")
+
+    print(f'Transformer model parameters: {model.num_parameters()}')
 
     # Datasets and DataLoaders
     train_dataset = Dataset(tokenizer(x_train, truncation=True, padding=True), y_train)
@@ -263,41 +293,63 @@ def transformer_classification(portion=1.):
         train_loss.append(loss)
 
         evaluate_model(model, val_loader, dev, metric)
-        val_accuracy.append(metric.compute())
+        val_accuracy.append(metric.compute()['accuracy'])
 
     plt.plot(train_loss)
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.title('Train Loss')
-    plt.savefig('transformer_loss.png')
+    plt.savefig(f'transformer_loss_portion_{portion}.png')
     plt.close()
 
     plt.plot(val_accuracy)
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.title('Test Accuracy')
-    plt.savefig('transformer_accuracy.png')
+    plt.savefig(f'transformer_accuracy_portion_{portion}.png')
     plt.close()
+
+def model_get_parameter_count(model):
+    """
+    Get the number of trainable parameters in the model
+    :param model: The model to count the parameters of
+    :return: The number of trainable parameters in the model
+    """
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 def q1(portions):
     """
     """
+    final_accuracies = []
+
     for p in portions:
         print(f"\nMLP results for portion {p}:")
-        model = nn.Sequential(nn.Linear(2000, 4), nn.Softmax(dim=1))
-        MLP_classification(model, portion=p)
+        # model = nn.Sequential(nn.Linear(2000, 4), nn.Softmax(dim=1))
+        model = LogLinearClassifier(input_dim=2000, output_dim=4)
+        train_loss, test_accuracy = MLP_classification(model, batch_size=16, epochs=20, lr=1e-3, portion=p)
+        final_accuracies.append(test_accuracy)
+        print(f'Log Linear Classifier trainable parameters: {model_get_parameter_count(model)}')
+    
+    print(f"Log Linear Classifier Final accuracies: {final_accuracies}")
 
 def q2(portions):
     """
     """
+    final_accuracies = []
+
     for p in portions:
         print(f"\nMLP results for portion {p}:")
-        model = nn.Sequential(
-            nn.Linear(2000, 500),
-            nn.ReLU(),
-            nn.Linear(500, 4),
-            nn.Softmax(dim=1))
-        MLP_classification(model, portion=p)
+        # model = nn.Sequential(
+        #     nn.Linear(2000, 500),
+        #     nn.ReLU(),
+        #     nn.Linear(500, 4),
+        #     nn.Softmax(dim=1))
+        model = MLPClassifier(input_dim=2000, hidden_dim=500, output_dim=4)
+        train_loss, test_accuracy = MLP_classification(model, batch_size=16, epochs=20, lr=1e-3, portion=p)
+        final_accuracies.append(test_accuracy)
+        print(f'MLP Classifier trainable parameters: {model_get_parameter_count(model)}')
+
+    print(f"MLP Classifier Final accuracies: {final_accuracies}")
 
 if __name__ == "__main__":
     portions = [0.1, 0.2, 0.5, 1.]
@@ -305,7 +357,7 @@ if __name__ == "__main__":
     # q1(portions)
 
     # Q2 - multi-layer MLP
-    #q2(portions)
+    # q2(portions)
 
     # Q3 - Transformer
     print("\nTransformer results:")
