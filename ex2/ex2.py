@@ -177,21 +177,7 @@ def MLP_classification(model, batch_size, epochs, lr, portion):
     train_losses, train_accuracies, test_accuracies = \
         train_model(model, trainloader, testloader, epochs=epochs, lr=lr)
 
-    plt.plot(train_losses)
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title(f'Train Loss - {model.name()}')
-    plt.savefig(f'{model.name()}_loss_portion_{portion}.png')
-    plt.close()
-
-    plt.plot(test_accuracies)
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.title(f'Test Accuracy - {model.name()}')
-    plt.savefig(f'{model.name()}_accuracy_portion_{portion}.png')
-    plt.close()
-
-    return train_losses[-1], test_accuracies[-1]
+    return train_losses, test_accuracies
 
 # Q3
 def transformer_classification(portion=1.):
@@ -317,47 +303,62 @@ def model_get_parameter_count(model):
     """
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
+def run_model(model, portions):
+    """
+    """
+
+    param_count = 0
+    train_losses = []
+    test_accuracies = []
+
+    for p in portions:
+        print(f"{model.name} - Portion: {p}")
+        param_count = model_get_parameter_count(model)
+        train_loss, test_accuracy = MLP_classification(model, batch_size=16, epochs=20, lr=1e-3, portion=p)
+        train_losses.append(train_loss)
+        test_accuracies.append(test_accuracy)
+
+    print(f'{model.name()} trainable parameters: {param_count}')
+
+    # Visualizing loss & accuracy
+    for i, p in enumerate(portions):
+        plt.plot(train_losses[i], label=f'Portion: {p}')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title(f'Train Loss - {model.name()}')
+    plt.legend()
+    plt.savefig(f'{model.name()}_loss.png')
+    plt.close()
+
+    for i, p in enumerate(portions):
+        plt.plot(test_accuracies[i], label=f'Portion: {p}')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title(f'Test Accuracy - {model.name()}')
+    plt.legend()
+    plt.savefig(f'{model.name()}_accuracy.png')
+    plt.close()
+    
+
 def q1(portions):
     """
     """
-    final_accuracies = []
-
-    for p in portions:
-        print(f"\nMLP results for portion {p}:")
-        # model = nn.Sequential(nn.Linear(2000, 4), nn.Softmax(dim=1))
-        model = LogLinearClassifier(input_dim=2000, output_dim=4)
-        train_loss, test_accuracy = MLP_classification(model, batch_size=16, epochs=20, lr=1e-3, portion=p)
-        final_accuracies.append(test_accuracy)
-        print(f'Log Linear Classifier trainable parameters: {model_get_parameter_count(model)}')
-    
-    print(f"Log Linear Classifier Final accuracies: {final_accuracies}")
+    print("Single layer MLP results:")
+    run_model(LogLinearClassifier(input_dim=2000, output_dim=4), portions)
 
 def q2(portions):
     """
     """
-    final_accuracies = []
-
-    for p in portions:
-        print(f"\nMLP results for portion {p}:")
-        # model = nn.Sequential(
-        #     nn.Linear(2000, 500),
-        #     nn.ReLU(),
-        #     nn.Linear(500, 4),
-        #     nn.Softmax(dim=1))
-        model = MLPClassifier(input_dim=2000, hidden_dim=500, output_dim=4)
-        train_loss, test_accuracy = MLP_classification(model, batch_size=16, epochs=20, lr=1e-3, portion=p)
-        final_accuracies.append(test_accuracy)
-        print(f'MLP Classifier trainable parameters: {model_get_parameter_count(model)}')
-
-    print(f"MLP Classifier Final accuracies: {final_accuracies}")
+    print("Multi-layer MLP results:")
+    run_model(MLPClassifier(input_dim=2000, hidden_dim=500, output_dim=4), portions)
 
 if __name__ == "__main__":
     portions = [0.1, 0.2, 0.5, 1.]
     # Q1 - single layer MLP
-    # q1(portions)
+    q1(portions)
 
     # Q2 - multi-layer MLP
-    # q2(portions)
+    q2(portions)
 
     # Q3 - Transformer
     print("\nTransformer results:")
