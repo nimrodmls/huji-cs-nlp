@@ -7,8 +7,8 @@ class MostLikelyTag():
     using MLE for the estimation of the probabilities.
     """
     def __init__(self):
-        self.tag_count = {} # Count of each tag
-        self.word_tag_count = {} # Count of each word for each tag
+        self.tag_count = {} # Count of each tag {tag: count}
+        self.word_tag_count = {} # Count of each word for each tag {word: {tag: count}}
 
     def train(self, train_data):
         """
@@ -46,6 +46,52 @@ class MostLikelyTag():
                 max_tag = tag
 
         return max_tag
+    
+class Bigram_HMM():
+    
+    def __init__(self):
+        self.transition_probs = {} # Transition probabilities {tag1: {tag2: prob}}
+        self.emission_probs = {} # Emission probabilities {tag: {word: prob}}
+
+    def train(self, train_data):
+        # Computing the transition & emission probabilities using MLE
+
+        tag_transitions = {} # {tag1: {tag2: count}} - Count of each tag transition (bigram)
+        tag_word_count = {} # Count of each word for each tag {tag: {word: count}}
+
+        for sentence in train_data:
+            for word, tag in sentence:
+
+                # Counting the transitions between tags - for transition probabilities
+                if tag not in tag_transitions:
+                    tag_transitions[tag] = {}
+                if tag not in tag_transitions[tag]:
+                    tag_transitions[tag][tag] = 0
+                tag_transitions[tag][tag] += 1
+
+                # Counting the words for each tag - for emission probabilities
+                if tag not in tag_word_count:
+                    tag_word_count[tag] = {}
+                if word not in tag_word_count[tag]:
+                    tag_word_count[tag][word] = 0
+                tag_word_count[tag][word] += 1
+
+        self.transition_probs = tag_transitions
+        self.emission_probs = tag_word_count
+
+        for tag1 in self.transition_probs:
+
+            # Computing the transition probabilities
+            for tag2 in self.transition_probs[tag1]:
+                transition_count = sum(self.transition_probs[tag1].values())
+                # Calculating the probability by normalizing with the total count of transitions from tag1
+                self.transition_probs[tag1][tag2] = tag_transitions[tag1][tag2] / transition_count
+
+            # Computing the emission probabilities
+            for word in self.emission_probs[tag1]:
+                word_count = sum(self.emission_probs[tag].values())
+                # Calculating the probability by normalizing with the total count of words for the tag
+                self.emission_probs[tag1][word] = tag_word_count[tag1][word] / word_count
 
 def get_dataset():
     """
