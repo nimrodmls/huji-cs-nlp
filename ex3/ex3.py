@@ -66,6 +66,8 @@ class Bigram_HMM_Tagger():
         # Emission probabilities {tag: {word: prob}}
         self.emission_probs = {} 
 
+        self.vocab = set() # The vocabulary of the training data
+
     def train(self, train_data):
 
         # {tag1: {tag2: count}} - Count of each tag transition (bigram)
@@ -80,6 +82,9 @@ class Bigram_HMM_Tagger():
             for i in range(1, len(sentence)):
                 word, tag = sentence[i]
                 prev_word, prev_tag = sentence[i-1]
+
+                # Adding the word to the vocabulary
+                self.vocab.add(word)
 
                 # Counting the transitions between tags - for transition probabilities
                 if prev_tag not in tag_transitions:
@@ -129,6 +134,7 @@ class Bigram_HMM_Tagger():
         for t in range(1, T):
             viterbi[t] = {}
             backpointer[t] = {}
+
             for tag in self.transition_probs:
                 max_prob = -np.inf
                 max_tag = None
@@ -149,6 +155,11 @@ class Bigram_HMM_Tagger():
                 # Updating the table according to the max probability of the current tag
                 viterbi[t][tag] = max_prob
                 backpointer[t][tag] = max_tag
+            
+            if max(viterbi[t].values()) == -np.inf:
+                # Handling unknown words by assigning the tag 'NN' (arbitrary choice)
+                viterbi[t]['NN'] = 0
+                backpointer[t]['NN'] = list(viterbi[t-1].keys())[np.argmax(list(viterbi[t-1].values()))]
 
         # Finding the most likely tag sequence by backtracking
         max_prob = -np.inf
@@ -175,7 +186,7 @@ def get_dataset():
     all_data = nltk.corpus.brown.tagged_sents(categories='news')
     # Artifically adding the START/END tokens & tags to the sentences
     all_data = [[(START_TOK, START_TAG)] + sentence + [(STOP_TOK, STOP_TAG)] for sentence in all_data]
-    train_data, test_data = train_test_split(all_data, test_size=0.1)
+    train_data, test_data = train_test_split(all_data, test_size=0.1, shuffle=False) # TODO: Change shuffle to true
     return train_data, test_data
 
 def download_corpus():
