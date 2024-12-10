@@ -1,6 +1,11 @@
 import nltk
 from sklearn.model_selection import train_test_split
 
+START_TOK = '<START>'
+START_TAG = START_TOK
+STOP_TOK = '<STOP>'
+STOP_TAG = STOP_TOK
+
 class MostLikelyTag():
     """
     A class that assigns the most likely tag to a word, based on the training data,
@@ -47,7 +52,10 @@ class MostLikelyTag():
 
         return max_tag
     
-class Bigram_HMM():
+class Bigram_HMM_Tagger():
+    """
+    Text tagging model using a Bigram Hidden Markov Model
+    """
     
     def __init__(self):
         self.transition_probs = {} # Transition probabilities {tag1: {tag2: prob}}
@@ -80,7 +88,6 @@ class Bigram_HMM():
         self.emission_probs = tag_word_count
 
         for tag1 in self.transition_probs:
-
             # Computing the transition probabilities
             for tag2 in self.transition_probs[tag1]:
                 transition_count = sum(self.transition_probs[tag1].values())
@@ -92,6 +99,55 @@ class Bigram_HMM():
                 word_count = sum(self.emission_probs[tag].values())
                 # Calculating the probability by normalizing with the total count of words for the tag
                 self.emission_probs[tag1][word] = tag_word_count[tag1][word] / word_count
+    
+    def predict(self, sentence):
+        """
+        Runs the Viterbi algorithm to find the most likely tag sequence for the sentence
+        Note that the algorithm runs at each call, as it's sensitive to the length of the given sentence
+        """
+        # NOTE: Implemented all probabilities in log space to avoid diminishing probabilities
+
+        # Initialization
+        viterbi = {0: {START_TAG: 0}}
+        backpointer = {0: {START_TAG: None}}
+        T = len(sentence)
+
+        # Recursion
+        for t in range(1, T+1):
+            viterbi[t] = {}
+            backpointer[t] = {}
+            for tag in self.transition_probs:
+                max_prob = float('-inf')
+                max_tag = None
+                for prev_tag in self.transition_probs:
+                    # Computing the probability of the transition
+                    transition_prob = self.transition_probs[prev_tag][tag]
+                    # Computing the probability of the emission
+                    emission_prob = self.emission_probs[tag][sentence[t-1]]
+                    # Computing the probability of the current tag sequence
+                    prob = viterbi[t-1][prev_tag] + transition_prob + emission_prob
+                    if prob > max_prob:
+                        max_prob = prob
+                        max_tag = prev_tag
+                viterbi[t][tag] = max_prob
+                backpointer[t][tag] = max_tag
+
+        # Termination
+        max_prob = float('-inf')
+        max_tag = None
+        for tag in self.transition_probs:
+            prob = viterbi[T][tag]
+            if prob > max_prob:
+                max_prob = prob
+                max_tag = tag
+
+        # Backtracking
+        tag_sequence = [max_tag]
+        for t in range(T, 1, -1):
+            max_tag = backpointer[t][max_tag]
+            tag_sequence.insert(0, max_tag)
+
+        return tag_sequence
 
 def get_dataset():
     """
@@ -99,6 +155,8 @@ def get_dataset():
     The sentences are split to 90% training and 10% testing.
     """
     all_data = nltk.corpus.brown.tagged_sents(categories='news')
+    # Artifically adding the START/END tokens & tags to the sentences
+    all_data = [[(START_TOK, START_TAG)] + sentence + [(STOP_TOK, STOP_TAG)] for sentence in all_data]
     train_data, test_data = train_test_split(all_data, test_size=0.1)
     return train_data, test_data
 
