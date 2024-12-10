@@ -107,12 +107,13 @@ class Bigram_HMM_Tagger():
         """
         # NOTE: Implemented all probabilities in log space to avoid diminishing probabilities
 
-        # Initialization
-        viterbi = {0: {START_TAG: 0}}
+        # The viterbi table - {t: {tag: prob}}, the list is ordered by the observations
+        viterbi = {0: {tag: 0 for tag in self.transition_probs}}
+        viterbi[0][START_TAG] = 1
         backpointer = {0: {START_TAG: None}}
-        T = len(sentence)
+        T = len(sentence) # Length of the sentence (number of observations)
 
-        # Recursion
+        # Iterating through all the observations, except the start
         for t in range(1, T+1):
             viterbi[t] = {}
             backpointer[t] = {}
@@ -129,6 +130,7 @@ class Bigram_HMM_Tagger():
                     if prob > max_prob:
                         max_prob = prob
                         max_tag = prev_tag
+                # Updating the table according to the max probability of the current tag
                 viterbi[t][tag] = max_prob
                 backpointer[t][tag] = max_tag
 
