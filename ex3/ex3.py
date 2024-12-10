@@ -58,31 +58,42 @@ class Bigram_HMM_Tagger():
     """
     
     def __init__(self):
-        self.transition_probs = {} # Transition probabilities {tag1: {tag2: prob}}
-        self.emission_probs = {} # Emission probabilities {tag: {word: prob}}
+        # Transition probabilities {tag1: {tag2: prob}}
+        self.transition_probs = {} 
+
+        # Emission probabilities {tag: {word: prob}}
+        self.emission_probs = {} 
 
     def train(self, train_data):
-        # Computing the transition & emission probabilities using MLE
 
-        tag_transitions = {} # {tag1: {tag2: count}} - Count of each tag transition (bigram)
-        tag_word_count = {} # Count of each word for each tag {tag: {word: count}}
+        # {tag1: {tag2: count}} - Count of each tag transition (bigram)
+        tag_transitions = {}
 
+         # Count of each word for each tag {tag: {word: count}}
+        tag_word_count = {START_TAG: {START_TOK: 0}, STOP_TAG: {STOP_TOK: 0}}
+
+        # Counting and then computing the transition & emission probabilities using MLE
         for sentence in train_data:
-            for word, tag in sentence:
+            # Iterating on all pairs of words and their tags in the sentence
+            for i in range(1, len(sentence)):
+                word, tag = sentence[i]
+                prev_word, prev_tag = sentence[i-1]
 
                 # Counting the transitions between tags - for transition probabilities
-                if tag not in tag_transitions:
-                    tag_transitions[tag] = {}
-                if tag not in tag_transitions[tag]:
-                    tag_transitions[tag][tag] = 0
-                tag_transitions[tag][tag] += 1
+                if prev_tag not in tag_transitions:
+                    tag_transitions[prev_tag] = {}
+                if tag not in tag_transitions[prev_tag]:
+                    tag_transitions[prev_tag][tag] = 0
+                tag_transitions[prev_tag][tag] += 1
 
                 # Counting the words for each tag - for emission probabilities
-                if tag not in tag_word_count:
-                    tag_word_count[tag] = {}
-                if word not in tag_word_count[tag]:
-                    tag_word_count[tag][word] = 0
-                tag_word_count[tag][word] += 1
+                if prev_tag not in tag_word_count:
+                    tag_word_count[prev_tag] = {}
+                if prev_word not in tag_word_count[prev_tag]:
+                    tag_word_count[prev_tag][prev_word] = 0
+                tag_word_count[prev_tag][prev_word] += 1
+    
+        tag_word_count[STOP_TAG][STOP_TOK] = tag_word_count[START_TAG][START_TOK]
 
         self.transition_probs = tag_transitions
         self.emission_probs = tag_word_count
@@ -108,13 +119,14 @@ class Bigram_HMM_Tagger():
         # NOTE: Implemented all probabilities in log space to avoid diminishing probabilities
 
         # The viterbi table - {t: {tag: prob}}, the list is ordered by the observations
+        # The table is initialized for the first observation (assumed to be start of sentence)
         viterbi = {0: {tag: 0 for tag in self.transition_probs}}
         viterbi[0][START_TAG] = 1
         backpointer = {0: {START_TAG: None}}
         T = len(sentence) # Length of the sentence (number of observations)
 
         # Iterating through all the observations, except the start
-        for t in range(1, T+1):
+        for t in range(1, T):
             viterbi[t] = {}
             backpointer[t] = {}
             for tag in self.transition_probs:
@@ -122,9 +134,13 @@ class Bigram_HMM_Tagger():
                 max_tag = None
                 for prev_tag in self.transition_probs:
                     # Computing the probability of the transition
-                    transition_prob = self.transition_probs[prev_tag][tag]
+                    transition_prob = 0
+                    if tag in self.transition_probs[prev_tag]:
+                        transition_prob = self.transition_probs[prev_tag][tag]
                     # Computing the probability of the emission
-                    emission_prob = self.emission_probs[tag][sentence[t-1]]
+                    emission_prob = 0
+                    if sentence[t] in self.emission_probs[tag]:
+                        emission_prob = self.emission_probs[tag][sentence[t]]
                     # Computing the probability of the current tag sequence
                     prob = viterbi[t-1][prev_tag] + transition_prob + emission_prob
                     if prob > max_prob:
@@ -134,18 +150,18 @@ class Bigram_HMM_Tagger():
                 viterbi[t][tag] = max_prob
                 backpointer[t][tag] = max_tag
 
-        # Termination
+        # Finding the most likely tag sequence by backtracking
         max_prob = float('-inf')
         max_tag = None
-        for tag in self.transition_probs:
-            prob = viterbi[T][tag]
+        for tag in viterbi[T-1]:
+            prob = viterbi[T-1][tag]
             if prob > max_prob:
                 max_prob = prob
                 max_tag = tag
 
-        # Backtracking
+        # Building the tag sequence by backtracking
         tag_sequence = [max_tag]
-        for t in range(T, 1, -1):
+        for t in range(T-1, 1, -1):
             max_tag = backpointer[t][max_tag]
             tag_sequence.insert(0, max_tag)
 
@@ -174,10 +190,16 @@ def main():
     train_set, test_set = get_dataset()
     
     # Task B - Training a Most Likely Tag baseline
-    mlt = MostLikelyTag()
-    mlt.train(train_set)
+    # mlt = MostLikelyTag()
+    # mlt.train(train_set)
 
     ### TODO: Add evaluation here
+
+    # Task C - Bigram HMM Tagger
+    bigram_hmm = Bigram_HMM_Tagger()
+    bigram_hmm.train(train_set)
+    result = bigram_hmm.predict([word for word, tag in test_set[0]])
+    pass
     
 
 if __name__ == '__main__':
