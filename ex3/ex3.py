@@ -1,4 +1,5 @@
 import nltk
+import numpy as np
 from sklearn.model_selection import train_test_split
 
 START_TOK = '<START>'
@@ -55,6 +56,7 @@ class MostLikelyTag():
 class Bigram_HMM_Tagger():
     """
     Text tagging model using a Bigram Hidden Markov Model
+    NOTE: Implemented all probabilities in log space to avoid diminishing probabilities
     """
     
     def __init__(self):
@@ -100,28 +102,26 @@ class Bigram_HMM_Tagger():
 
         for tag1 in self.transition_probs:
             # Computing the transition probabilities
+            transition_count = sum(self.transition_probs[tag1].values())
             for tag2 in self.transition_probs[tag1]:
-                transition_count = sum(self.transition_probs[tag1].values())
                 # Calculating the probability by normalizing with the total count of transitions from tag1
-                self.transition_probs[tag1][tag2] = tag_transitions[tag1][tag2] / transition_count
+                self.transition_probs[tag1][tag2] = np.log(self.transition_probs[tag1][tag2] / transition_count)
 
             # Computing the emission probabilities
+            word_count = sum(self.emission_probs[tag].values())
             for word in self.emission_probs[tag1]:
-                word_count = sum(self.emission_probs[tag].values())
                 # Calculating the probability by normalizing with the total count of words for the tag
-                self.emission_probs[tag1][word] = tag_word_count[tag1][word] / word_count
+                self.emission_probs[tag1][word] = np.log(self.emission_probs[tag1][word] / word_count)
     
     def predict(self, sentence):
         """
         Runs the Viterbi algorithm to find the most likely tag sequence for the sentence
         Note that the algorithm runs at each call, as it's sensitive to the length of the given sentence
         """
-        # NOTE: Implemented all probabilities in log space to avoid diminishing probabilities
-
         # The viterbi table - {t: {tag: prob}}, the list is ordered by the observations
         # The table is initialized for the first observation (assumed to be start of sentence)
-        viterbi = {0: {tag: 0 for tag in self.transition_probs}}
-        viterbi[0][START_TAG] = 1
+        viterbi = {0: {tag: -np.inf for tag in self.transition_probs}}
+        viterbi[0][START_TAG] = 0
         backpointer = {0: {START_TAG: None}}
         T = len(sentence) # Length of the sentence (number of observations)
 
@@ -130,15 +130,15 @@ class Bigram_HMM_Tagger():
             viterbi[t] = {}
             backpointer[t] = {}
             for tag in self.transition_probs:
-                max_prob = float('-inf')
+                max_prob = -np.inf
                 max_tag = None
                 for prev_tag in self.transition_probs:
                     # Computing the probability of the transition
-                    transition_prob = 0
+                    transition_prob = -np.inf
                     if tag in self.transition_probs[prev_tag]:
                         transition_prob = self.transition_probs[prev_tag][tag]
                     # Computing the probability of the emission
-                    emission_prob = 0
+                    emission_prob = -np.inf
                     if sentence[t] in self.emission_probs[tag]:
                         emission_prob = self.emission_probs[tag][sentence[t]]
                     # Computing the probability of the current tag sequence
@@ -151,7 +151,7 @@ class Bigram_HMM_Tagger():
                 backpointer[t][tag] = max_tag
 
         # Finding the most likely tag sequence by backtracking
-        max_prob = float('-inf')
+        max_prob = -np.inf
         max_tag = None
         for tag in viterbi[T-1]:
             prob = viterbi[T-1][tag]
@@ -161,8 +161,8 @@ class Bigram_HMM_Tagger():
 
         # Building the tag sequence by backtracking
         tag_sequence = [max_tag]
-        for t in range(T-1, 1, -1):
-            max_tag = backpointer[t][max_tag]
+        for t in range(T-2, -1, -1):
+            max_tag = backpointer[t + 1][max_tag]
             tag_sequence.insert(0, max_tag)
 
         return tag_sequence
