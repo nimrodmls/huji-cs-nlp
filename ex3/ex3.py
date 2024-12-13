@@ -1,6 +1,7 @@
 import nltk
 import numpy as np
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 START_TOK = '<START>'
 START_TAG = START_TOK
@@ -68,7 +69,7 @@ class Bigram_HMM_Tagger():
 
         self.vocab = set() # The vocabulary of the training data
 
-    def train(self, train_data):
+    def train(self, train_data, add_one_smoothing=False):
 
         # {tag1: {tag2: count}} - Count of each tag transition (bigram)
         tag_transitions = {}
@@ -109,14 +110,18 @@ class Bigram_HMM_Tagger():
             # Computing the transition probabilities
             transition_count = sum(self.transition_probs[tag1].values())
             for tag2 in self.transition_probs[tag1]:
-                # Calculating the probability by normalizing with the total count of transitions from tag1
+                # MLE
                 self.transition_probs[tag1][tag2] = np.log(self.transition_probs[tag1][tag2] / transition_count)
 
             # Computing the emission probabilities
             word_count = sum(self.emission_probs[tag].values())
             for word in self.emission_probs[tag1]:
-                # Calculating the probability by normalizing with the total count of words for the tag
-                self.emission_probs[tag1][word] = np.log(self.emission_probs[tag1][word] / word_count)
+                if add_one_smoothing:
+                    # Add-one smoothing
+                    self.emission_probs[tag1][word] = np.log((self.emission_probs[tag1][word] + 1) / (word_count + len(self.vocab)))
+                else:
+                    # Purely MLE
+                    self.emission_probs[tag1][word] = np.log(self.emission_probs[tag1][word] / word_count)
     
     def predict(self, sentence):
         """
@@ -195,6 +200,49 @@ def download_corpus():
     """
     nltk.download('brown')
 
+def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False):
+    """
+    """
+    bigram_hmm = Bigram_HMM_Tagger()
+    bigram_hmm.train(train_set, add_one_smoothing=add_one_smoothing)
+    test_x = []
+    test_y = []
+    for sentence in test_set:
+        sent_words = []
+        sent_tags = []
+
+        for word, tag in sentence:
+            sent_words.append(word)
+            sent_tags.append(tag)
+
+        test_x.append(sent_words)
+        test_y.append(sent_tags)
+
+    correct_preds = 0
+    total_preds = 0
+    for x, y in tqdm(list(zip(test_x, test_y))):
+        y_pred = bigram_hmm.predict(x)
+
+        total_preds += len(y)
+        for true, pred in zip(y, y_pred):
+            if true == pred:
+                correct_preds += 1
+
+    accuracy = correct_preds / total_preds
+    print(f'Error rate: {1 - accuracy}')
+
+def task_3(train_set, test_set):
+    """
+    Runs the experiments for Task 3
+    """
+    bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False)
+
+def task_4(train_set, test_set):
+    """
+    Runs the experiments for Task 4
+    """
+    bigram_hmm_experiment(train_set, test_set, add_one_smoothing=True)
+
 def main():
     download_corpus()
     # Task A - Getting the dataset
@@ -207,10 +255,10 @@ def main():
     ### TODO: Add evaluation here
 
     # Task C - Bigram HMM Tagger
-    bigram_hmm = Bigram_HMM_Tagger()
-    bigram_hmm.train(train_set)
-    result = bigram_hmm.predict([word for word, tag in test_set[0]])
-    pass
+    #task_3(train_set, test_set)
+
+    # Task D - Bigram HMM Tagger with Add-One Smoothing
+    task_4(train_set, test_set)
     
 
 if __name__ == '__main__':
