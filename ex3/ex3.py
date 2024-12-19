@@ -60,17 +60,16 @@ class Bigram_HMM_Tagger():
     Text tagging model using a Bigram Hidden Markov Model
     NOTE: Implemented all probabilities in log space to avoid diminishing probabilities
     """
-    PSEUDOWORDS_THRESHOLD = 5 # Frequency threshold for pseudowords
     PSEDUOWORDS_SUFFIXES = {
         '\'s': 'Association', 's\'': 'Association', # Associative suffixes (e.g. John's)
         'teen': 'NumberWord', # A number represented in its word form (e.g. seventeen)
     }
     
-    def __init__(self, is_pseudowords=False):
+    def __init__(self, pseudowords_threshold=0):
         """
         :param pseudowords: Whether to use pseudowords or not (in training & prediction)
         """
-        self.is_pseudowords = is_pseudowords
+        self.pseudowords_threshold = pseudowords_threshold
 
         # Transition probabilities {tag1: {tag2: prob}}
         self.transition_probs = {} 
@@ -156,7 +155,7 @@ class Bigram_HMM_Tagger():
             current_word_tag_counts = mlt.word_tag_count[word]
             word_freq = sum(mlt.word_tag_count[word].values())
             # Handling pseudowords, if enabled
-            if self.is_pseudowords and word_freq <= self.PSEUDOWORDS_THRESHOLD:
+            if word_freq <= self.pseudowords_threshold:
                     word = self._get_pseudoword(word)
 
             for tag in current_word_tag_counts:
@@ -230,7 +229,7 @@ class Bigram_HMM_Tagger():
                     emission_prob = -np.inf
                     if sentence[t] in self.emission_probs[tag]:
                         emission_prob = self.emission_probs[tag][sentence[t]]
-                    elif self.is_pseudowords: # Handling pseudowords, if enabled
+                    elif 0 < self.pseudowords_threshold: # Handling pseudowords, if enabled
                         pseudoword = self._get_pseudoword(sentence[t])
                         if pseudoword in self.emission_probs[tag]:
                             emission_prob = self.emission_probs[tag][pseudoword]
@@ -282,10 +281,12 @@ def download_corpus():
     """
     nltk.download('brown')
 
-def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False, pseudowords=False):
+def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False, pseudowords_threshold=0):
     """
+    :param pseudowords_threshold: The frequency threshold to apply for pseudoword selection
+                                  if this threshold is 0, pseudowords are not used
     """
-    bigram_hmm = Bigram_HMM_Tagger(is_pseudowords=pseudowords)
+    bigram_hmm = Bigram_HMM_Tagger(pseudowords_threshold=pseudowords_threshold)
     bigram_hmm.train(train_set, add_one_smoothing=add_one_smoothing)
     test_x = []
     test_y = []
@@ -336,7 +337,7 @@ def task_5(train_set, test_set):
     # with open("unique_words.txt", "w") as f:
     #     for word in unique_words:
     #         f.write(f'{word}\n')
-    bigram_hmm_experiment(train_set, test_set, add_one_smoothing=True, pseudowords=True)
+    bigram_hmm_experiment(train_set, test_set, add_one_smoothing=True, pseudowords_threshold=2)
 
 def corpus_visualize_frequency_distribution(corpus):
     """
