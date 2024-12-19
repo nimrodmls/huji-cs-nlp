@@ -9,6 +9,17 @@ START_TAG = START_TOK
 STOP_TOK = '<STOP>'
 STOP_TAG = STOP_TOK
 
+def simplify_tag(tag):
+    """
+    Simplifies the given tag from its complex form
+    A complex form is one that contains + or -
+    """
+    if '+' in tag:
+        return tag.split('+')[0]
+    elif '-' in tag:
+        return tag.split('-')[0]
+    return tag # If the tag is already simple
+
 class MostLikelyTag():
     """
     A class that assigns the most likely tag to a word, based on the training data,
@@ -22,11 +33,8 @@ class MostLikelyTag():
         """
         Trains the model with the training data
         """
-        word_counts = {} # Count of each word {word: count}
-
         for sentence in train_data:
             for word, tag in sentence:
-
                 if word not in self.word_tag_counts:
                     self.word_tag_counts[word] = {}
                 if tag not in self.word_tag_counts[word]:
@@ -34,16 +42,11 @@ class MostLikelyTag():
 
                 self.word_tag_counts[word][tag] += 1
 
-                if word not in word_counts:
-                    word_counts[word] = 0
-
-                word_counts[word] += 1
-
-            # Compute most likely tag for each word
-            self.word_most_likely_tag = {}
-            for word, tags in self.word_tag_counts.items():
-                most_likely_tag = max(tags.items(), key=lambda x: x[1])[0]
-                self.word_most_likely_tag[word] = most_likely_tag
+        # Compute most likely tag for each word
+        self.word_most_likely_tag = {}
+        for word, tags in self.word_tag_counts.items():
+            most_likely_tag = max(tags.items(), key=lambda x: x[1])[0]
+            self.word_most_likely_tag[word] = most_likely_tag
 
     def predict(self, sentence):
         tags = []
@@ -272,7 +275,7 @@ def get_dataset():
     """
     all_data = nltk.corpus.brown.tagged_sents(categories='news')
     # Artifically adding the START/END tokens & tags to the sentences
-    all_data = [[(START_TOK, START_TAG)] + sentence + [(STOP_TOK, STOP_TAG)] for sentence in all_data]
+    all_data = [[(START_TOK, START_TAG)] + [(word, simplify_tag(tag)) for word, tag in sentence] + [(STOP_TOK, STOP_TAG)] for sentence in all_data]
     train_data, test_data = train_test_split(all_data, test_size=0.1, shuffle=False) # TODO: Change shuffle to true
     return train_data, test_data
 
@@ -372,7 +375,7 @@ def corpus_visualize_frequency_distribution(corpus):
     for word in mlt.word_tag_count:
         freqs.append(sum(mlt.word_tag_count[word].values()))
 
-    bins = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    bins = range(0, 11)
     plt.hist(freqs, bins=bins)
     plt.xticks(bins)
     plt.xlabel('Frequency')
