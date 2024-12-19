@@ -276,7 +276,7 @@ def get_dataset():
     all_data = nltk.corpus.brown.tagged_sents(categories='news')
     # Artifically adding the START/END tokens & tags to the sentences
     all_data = [[(START_TOK, START_TAG)] + [(word, simplify_tag(tag)) for word, tag in sentence] + [(STOP_TOK, STOP_TAG)] for sentence in all_data]
-    train_data, test_data = train_test_split(all_data, test_size=0.1, shuffle=False) # TODO: Change shuffle to true
+    train_data, test_data = train_test_split(all_data, test_size=0.1, shuffle=True) # TODO: Change shuffle to true
     return train_data, test_data
 
 def download_corpus():
@@ -399,7 +399,7 @@ def main():
     train_set, test_set = get_dataset()
     
     ### Task B - Training a Most Likely Tag baseline
-    # task_2(train_set, test_set)
+    task_2(train_set, test_set)
 
     ### Task C - Bigram HMM Tagger
     task_3(train_set, test_set)
