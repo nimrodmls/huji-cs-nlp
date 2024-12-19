@@ -16,44 +16,44 @@ class MostLikelyTag():
     """
     def __init__(self):
         self.tag_count = {} # Count of each tag {tag: count}
-        self.word_tag_count = {} # Count of each word for each tag {word: {tag: count}}
+        self.word_tag_counts = {} # Count of each word for each tag {word: {tag: count}}
 
     def train(self, train_data):
         """
         Trains the model with the training data
         """
-        # Each sentence is split to words and their respective tags (as tuples)
+        word_counts = {} # Count of each word {word: count}
+
         for sentence in train_data:
             for word, tag in sentence:
 
-                # Counting the tags                
-                if tag not in self.tag_count:
-                    self.tag_count[tag] = 0
-                self.tag_count[tag] += 1
+                if word not in self.word_tag_counts:
+                    self.word_tag_counts[word] = {}
+                if tag not in self.word_tag_counts[word]:
+                    self.word_tag_counts[word][tag] = 0
 
-                # Counting the words for each tag
-                if word not in self.word_tag_count:
-                    self.word_tag_count[word] = {}
-                if tag not in self.word_tag_count[word]:
-                    self.word_tag_count[word][tag] = 0
-                self.word_tag_count[word][tag] += 1
+                self.word_tag_counts[word][tag] += 1
 
-    def predict(self, word):
-        # Handling unknown words (e.g. words that are not in the training data)
-        # by assigning the tag 'NN' as defined in the assignment
-        if word not in self.word_tag_count:
-            return 'NN'
-        
-        # Finding the tag with the highest probability for the word
-        max_prob = 0
-        max_tag = ''
-        for tag in self.word_tag_count[word]:
-            prob = self.word_tag_count[word][tag] / self.tag_count[tag]
-            if prob > max_prob:
-                max_prob = prob
-                max_tag = tag
+                if word not in word_counts:
+                    word_counts[word] = 0
 
-        return max_tag
+                word_counts[word] += 1
+
+            # Compute most likely tag for each word
+            self.word_most_likely_tag = {}
+            for word, tags in self.word_tag_counts.items():
+                most_likely_tag = max(tags.items(), key=lambda x: x[1])[0]
+                self.word_most_likely_tag[word] = most_likely_tag
+
+    def predict(self, sentence):
+        tags = []
+        for word in sentence:
+            if word not in self.word_most_likely_tag: # Unknown words
+                tags.append('NN')
+            else:
+                tags.append(self.word_most_likely_tag[word])
+
+        return tags
     
 class Bigram_HMM_Tagger():
     """
@@ -65,10 +65,11 @@ class Bigram_HMM_Tagger():
         'teen': 'NumberWord', # A number represented in its word form (e.g. seventeen)
     }
     
-    def __init__(self, pseudowords_threshold=0):
+    def __init__(self, add_one_smoothing=False, pseudowords_threshold=0):
         """
         :param pseudowords: Whether to use pseudowords or not (in training & prediction)
         """
+        self.add_one_smoothing = add_one_smoothing
         self.pseudowords_threshold = pseudowords_threshold
 
         # Transition probabilities {tag1: {tag2: prob}}
@@ -137,7 +138,7 @@ class Bigram_HMM_Tagger():
         
         return word # If no pseudoword was found, return the original word
 
-    def train(self, train_data, add_one_smoothing=False):
+    def train(self, train_data):
 
         # {tag1: {tag2: count}} - Count of each tag transition (bigram)
         tag_transitions = {}
@@ -148,12 +149,12 @@ class Bigram_HMM_Tagger():
         mlt = MostLikelyTag()
         mlt.train(train_data)
 
-        self.vocab = set(mlt.word_tag_count.keys())
+        self.vocab = set(mlt.word_tag_counts.keys())
 
         # Reversing the word_tag_count to tag_word_count
-        for word in mlt.word_tag_count:
-            current_word_tag_counts = mlt.word_tag_count[word]
-            word_freq = sum(mlt.word_tag_count[word].values())
+        for word in mlt.word_tag_counts:
+            current_word_tag_counts = mlt.word_tag_counts[word]
+            word_freq = sum(mlt.word_tag_counts[word].values())
             # Handling pseudowords, if enabled
             if word_freq <= self.pseudowords_threshold:
                     word = self._get_pseudoword(word)
@@ -193,7 +194,7 @@ class Bigram_HMM_Tagger():
             # Computing the emission probabilities
             word_count = sum(self.emission_probs[tag].values())
             for word in self.emission_probs[tag1]:
-                if add_one_smoothing:
+                if self.add_one_smoothing:
                     # Add-one smoothing
                     self.emission_probs[tag1][word] = np.log((self.emission_probs[tag1][word] + 1) / (word_count + len(self.vocab)))
                 else:
@@ -281,13 +282,20 @@ def download_corpus():
     """
     nltk.download('brown')
 
-def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False, pseudowords_threshold=0):
+def sentence_count_correct_preds(y_true, y_pred):
     """
-    :param pseudowords_threshold: The frequency threshold to apply for pseudoword selection
-                                  if this threshold is 0, pseudowords are not used
     """
-    bigram_hmm = Bigram_HMM_Tagger(pseudowords_threshold=pseudowords_threshold)
-    bigram_hmm.train(train_set, add_one_smoothing=add_one_smoothing)
+    correct_preds = 0
+    for true, pred in zip(y_true, y_pred):
+        if true == pred:
+            correct_preds += 1
+
+    return correct_preds
+
+def run_experiment(model, train_set, test_set):
+    """
+    """
+    model.train(train_set)
     test_x = []
     test_y = []
     for sentence in test_set:
@@ -304,16 +312,31 @@ def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False, pseudowo
     correct_preds = 0
     total_preds = 0
     for x, y in tqdm(list(zip(test_x, test_y))):
-        y_pred = bigram_hmm.predict(x)
+        y_pred = model.predict(x)
 
         total_preds += len(y)
-        # Counting the correct predictions, while ignoring the STOP tokens (last word)
-        for true, pred in zip(y[:-1], y_pred[:-1]):
-            if true == pred:
-                correct_preds += 1
+        # Ignoring the last word (STOP token)
+        correct_preds += sentence_count_correct_preds(y[:-1], y_pred[:-1])
 
     accuracy = correct_preds / total_preds
     print(f'Error rate: {1 - accuracy}')
+
+def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False, pseudowords_threshold=0):
+    """
+    :param pseudowords_threshold: The frequency threshold to apply for pseudoword selection
+                                  if this threshold is 0, pseudowords are not used
+    """
+    bigram_hmm_model = Bigram_HMM_Tagger(
+        add_one_smoothing=add_one_smoothing, 
+        pseudowords_threshold=pseudowords_threshold)
+    run_experiment(bigram_hmm_model, train_set, test_set)
+
+def task_2(train_set, test_set):
+    """
+    Runs the experiments for Task 2 - Most Likely Tag
+    """
+    mlt_model = MostLikelyTag()
+    run_experiment(mlt_model, train_set, test_set)
 
 def task_3(train_set, test_set):
     """
@@ -373,19 +396,16 @@ def main():
     train_set, test_set = get_dataset()
     
     ### Task B - Training a Most Likely Tag baseline
-    # mlt = MostLikelyTag()
-    # mlt.train(train_set)
-
-    ### TODO: Add evaluation here
+    # task_2(train_set, test_set)
 
     ### Task C - Bigram HMM Tagger
-    # task_3(train_set, test_set)
+    task_3(train_set, test_set)
 
     ### Task D - Bigram HMM Tagger with Add-One Smoothing
     # task_4(train_set, test_set)
 
     ### Task C - Bigram HMM Tagger with Pseudowords
-    task_5(train_set, test_set)
+    # task_5(train_set, test_set)
 
 
     
