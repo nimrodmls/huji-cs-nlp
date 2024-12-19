@@ -2,6 +2,7 @@ import nltk
 import numpy as np
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 START_TOK = '<START>'
 START_TAG = START_TOK
@@ -59,8 +60,18 @@ class Bigram_HMM_Tagger():
     Text tagging model using a Bigram Hidden Markov Model
     NOTE: Implemented all probabilities in log space to avoid diminishing probabilities
     """
+    PSEUDOWORDS_THRESHOLD = 5 # Frequency threshold for pseudowords
+    PSEDUOWORDS_SUFFIXES = {
+        '\'s': 'Association', 's\'': 'Association', # Associative suffixes (e.g. John's)
+        'teen': 'NumberWord', # A number represented in its word form (e.g. seventeen)
+    }
     
-    def __init__(self):
+    def __init__(self, is_pseudowords=False):
+        """
+        :param pseudowords: Whether to use pseudowords or not (in training & prediction)
+        """
+        self.is_pseudowords = is_pseudowords
+
         # Transition probabilities {tag1: {tag2: prob}}
         self.transition_probs = {} 
 
@@ -68,6 +79,62 @@ class Bigram_HMM_Tagger():
         self.emission_probs = {} 
 
         self.vocab = set() # The vocabulary of the training data
+
+    def _get_pseudoword(self, word):
+        """
+        Given a word, the function returns its pseudoword representation
+        This function DOES NOT check for the frequency of the given word
+        """
+        # Checking for suffixes
+        for suffix in self.PSEDUOWORDS_SUFFIXES:
+            # A word is considered suffixid if it ends with the suffix and is longer than the suffix
+            if word.endswith(suffix) and len(word) > len(suffix):
+                return self.PSEDUOWORDS_SUFFIXES[suffix]
+
+        # Checking for monetary values (e.g. 1,000.0)
+        is_monetary = True
+        is_symboled = False
+        for idx, ch in enumerate(word):
+            # The first character can be a digit or a currency symbol
+            if idx == 0 and ch in ['$', '€', '£']:
+                is_symboled = True
+                continue
+            # The currency symbol should be followed by a digit
+            elif idx == 1 and is_symboled and not ch.isdigit():
+                is_monetary = False
+                break 
+            # The rest of the characters should be digits or a comma or a dot
+            elif not (ch.isdigit() or ch in [',', '.']):
+                is_monetary = False
+                break
+        
+        if is_monetary:
+            return 'MonetaryValue'
+        
+        # Different number cases (e.g. 1997, 97)
+        if word.isdigit():
+            if len(word) == 4:
+                return 'FourDigitNumber'
+            elif len(word) == 3:
+                return 'ThreeDigitNumber'
+            elif len(word) == 2:
+                return 'TwoDigitNumber'
+                
+        # Checking for all caps words (e.g. JOHN)
+        if word.isupper():
+            return 'AllCaps'
+        
+        # Checking for all lowercase (e.g. john)
+        if word.islower():
+            return 'AllLower'
+
+        # Checking for initial caps (e.g. John)
+        if word[0].isupper():
+            return 'InitialCaps'
+        
+        # Hyphen-separated words (e.g. part-time)
+        if len(word.split('-')) > 1:
+            return 'HyphenatedWord'
 
     def train(self, train_data, add_one_smoothing=False):
 
@@ -224,7 +291,8 @@ def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False):
         y_pred = bigram_hmm.predict(x)
 
         total_preds += len(y)
-        for true, pred in zip(y, y_pred):
+        # Counting the correct predictions, while ignoring the STOP tokens (last word)
+        for true, pred in zip(y[:-1], y_pred[:-1]):
             if true == pred:
                 correct_preds += 1
 
@@ -243,22 +311,59 @@ def task_4(train_set, test_set):
     """
     bigram_hmm_experiment(train_set, test_set, add_one_smoothing=True)
 
+def corpus_visualize_frequency_distribution(corpus):
+    """
+    """
+    mlt = MostLikelyTag()
+    mlt.train(corpus)
+
+    freqs = []
+    for word in mlt.word_tag_count:
+        freqs.append(sum(mlt.word_tag_count[word].values()))
+
+    bins = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    plt.hist(freqs, bins=bins)
+    plt.xticks(bins)
+    plt.xlabel('Frequency')
+    plt.ylabel('Number of words')
+    plt.title('Frequency Distribution of Words in the Corpus')
+    plt.savefig("frequency_distribution.png")
+
+def corpus_get_unique_words(corpus, threshold=5):
+    """
+    :param corpus: List of sentences
+    :param threshold: Frequency threshold for uniqueness
+    """
+    mlt = MostLikelyTag()
+    mlt.train(corpus)
+    unique_words = [word for word in mlt.word_tag_count if sum(mlt.word_tag_count[word].values()) <= threshold]
+    return unique_words
+
 def main():
+    ### Task A - Getting the dataset
     download_corpus()
-    # Task A - Getting the dataset
     train_set, test_set = get_dataset()
     
-    # Task B - Training a Most Likely Tag baseline
+    ### Task B - Training a Most Likely Tag baseline
     # mlt = MostLikelyTag()
     # mlt.train(train_set)
 
     ### TODO: Add evaluation here
 
-    # Task C - Bigram HMM Tagger
-    #task_3(train_set, test_set)
+    ### Task C - Bigram HMM Tagger
+    # task_3(train_set, test_set)
 
-    # Task D - Bigram HMM Tagger with Add-One Smoothing
-    task_4(train_set, test_set)
+    ### Task D - Bigram HMM Tagger with Add-One Smoothing
+    # task_4(train_set, test_set)
+
+    ### Task C - Bigram HMM Tagger with Pseudowords
+    # Doing some analysis first, for choosing the pseudowords
+    corpus_visualize_frequency_distribution(train_set)
+    unique_words = corpus_get_unique_words(
+        train_set, threshold=3)
+    with open("unique_words.txt", "w") as f:
+        for word in unique_words:
+            f.write(f'{word}\n')
     
 
 if __name__ == '__main__':
