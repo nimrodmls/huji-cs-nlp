@@ -135,6 +135,8 @@ class Bigram_HMM_Tagger():
         # Hyphen-separated words (e.g. part-time)
         if len(word.split('-')) > 1:
             return 'HyphenatedWord'
+        
+        return word # If no pseudoword was found, return the original word
 
     def train(self, train_data, add_one_smoothing=False):
 
@@ -144,6 +146,27 @@ class Bigram_HMM_Tagger():
          # Count of each word for each tag {tag: {word: count}}
         tag_word_count = {START_TAG: {START_TOK: 0}, STOP_TAG: {STOP_TOK: 0}}
 
+        mlt = MostLikelyTag()
+        mlt.train(train_data)
+
+        self.vocab = set(mlt.word_tag_count.keys())
+
+        # Reversing the word_tag_count to tag_word_count
+        for word in mlt.word_tag_count:
+            current_word_tag_counts = mlt.word_tag_count[word]
+            word_freq = sum(mlt.word_tag_count[word].values())
+            # Handling pseudowords, if enabled
+            if self.is_pseudowords and word_freq <= self.PSEUDOWORDS_THRESHOLD:
+                    word = self._get_pseudoword(word)
+
+            for tag in current_word_tag_counts:
+                if tag not in tag_word_count: # Creating the tag if doesn't exist
+                    tag_word_count[tag] = {}
+                if word not in tag_word_count[tag]: # Creating the word, under the tag, if doesn't exist
+                    tag_word_count[tag][word] = 0
+                tag_word_count[tag][word] += current_word_tag_counts[tag]
+        tag_word_count[STOP_TAG][STOP_TOK] = tag_word_count[START_TAG][START_TOK]
+
         # Counting and then computing the transition & emission probabilities using MLE
         for sentence in train_data:
             # Iterating on all pairs of words and their tags in the sentence
@@ -151,25 +174,13 @@ class Bigram_HMM_Tagger():
                 word, tag = sentence[i]
                 prev_word, prev_tag = sentence[i-1]
 
-                # Adding the word to the vocabulary
-                self.vocab.add(word)
-
                 # Counting the transitions between tags - for transition probabilities
                 if prev_tag not in tag_transitions:
                     tag_transitions[prev_tag] = {}
                 if tag not in tag_transitions[prev_tag]:
                     tag_transitions[prev_tag][tag] = 0
                 tag_transitions[prev_tag][tag] += 1
-
-                # Counting the words for each tag - for emission probabilities
-                if prev_tag not in tag_word_count:
-                    tag_word_count[prev_tag] = {}
-                if prev_word not in tag_word_count[prev_tag]:
-                    tag_word_count[prev_tag][prev_word] = 0
-                tag_word_count[prev_tag][prev_word] += 1
     
-        tag_word_count[STOP_TAG][STOP_TOK] = tag_word_count[START_TAG][START_TOK]
-
         self.transition_probs = tag_transitions
         self.emission_probs = tag_word_count
 
@@ -219,6 +230,10 @@ class Bigram_HMM_Tagger():
                     emission_prob = -np.inf
                     if sentence[t] in self.emission_probs[tag]:
                         emission_prob = self.emission_probs[tag][sentence[t]]
+                    elif self.is_pseudowords: # Handling pseudowords, if enabled
+                        pseudoword = self._get_pseudoword(sentence[t])
+                        if pseudoword in self.emission_probs[tag]:
+                            emission_prob = self.emission_probs[tag][pseudoword]
                     # Computing the probability of the current tag sequence
                     prob = viterbi[t-1][prev_tag] + transition_prob + emission_prob
                     if prob > max_prob:
@@ -267,10 +282,10 @@ def download_corpus():
     """
     nltk.download('brown')
 
-def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False):
+def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False, pseudowords=False):
     """
     """
-    bigram_hmm = Bigram_HMM_Tagger()
+    bigram_hmm = Bigram_HMM_Tagger(is_pseudowords=pseudowords)
     bigram_hmm.train(train_set, add_one_smoothing=add_one_smoothing)
     test_x = []
     test_y = []
@@ -310,6 +325,18 @@ def task_4(train_set, test_set):
     Runs the experiments for Task 4
     """
     bigram_hmm_experiment(train_set, test_set, add_one_smoothing=True)
+
+def task_5(train_set, test_set):
+    """
+    """
+    # Doing some analysis first, for choosing the pseudowords
+    # corpus_visualize_frequency_distribution(train_set)
+    # unique_words = corpus_get_unique_words(
+    #     train_set, threshold=3)
+    # with open("unique_words.txt", "w") as f:
+    #     for word in unique_words:
+    #         f.write(f'{word}\n')
+    bigram_hmm_experiment(train_set, test_set, add_one_smoothing=True, pseudowords=True)
 
 def corpus_visualize_frequency_distribution(corpus):
     """
@@ -357,13 +384,9 @@ def main():
     # task_4(train_set, test_set)
 
     ### Task C - Bigram HMM Tagger with Pseudowords
-    # Doing some analysis first, for choosing the pseudowords
-    corpus_visualize_frequency_distribution(train_set)
-    unique_words = corpus_get_unique_words(
-        train_set, threshold=3)
-    with open("unique_words.txt", "w") as f:
-        for word in unique_words:
-            f.write(f'{word}\n')
+    task_5(train_set, test_set)
+
+
     
 
 if __name__ == '__main__':
