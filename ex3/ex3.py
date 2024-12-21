@@ -333,10 +333,13 @@ def run_experiment(model, train_set, test_set, build_confusion_matrix=False):
     total_known = 0
     total_correct_unknown = 0
     total_unknown = 0
-    
+
     confusion_matrix = None
     if build_confusion_matrix:
-        confusion_matrix = {tag1: {tag2: 0 for tag2 in model.emission_probs.keys()} for tag1 in model.emission_probs.keys()}
+        all_tags = set(
+            [tag for sentence in test_set for _, tag in sentence] + \
+            [tag for sentence in train_set for _, tag in sentence])
+        confusion_matrix = {tag1: {tag2: 0 for tag2 in all_tags} for tag1 in all_tags}
 
     for x, y in tqdm(list(zip(test_x, test_y))):
         y_pred = model.predict(x)
@@ -353,14 +356,16 @@ def run_experiment(model, train_set, test_set, build_confusion_matrix=False):
     print(f'Unknown words Error rate: {1 - (total_correct_unknown / total_unknown)}')
     print(f'Total Error rate: {1 - ((total_correct_known + total_correct_unknown) / (total_known + total_unknown))}')
 
+    # Exporting the confusion matrix to csv
     if build_confusion_matrix:
-        print("Confusion Matrix:")
-        print('\t' + '\t'.join(confusion_matrix.keys()))
-        for tag1 in confusion_matrix:
-            print(tag1, end='\t')
-            for tag2 in confusion_matrix[tag1]:
-                print(confusion_matrix[tag1][tag2], end='\t')
-            print()
+        with open('confusion_matrix.csv', 'w') as f:
+            f.write(',"' + '","'.join(confusion_matrix.keys()) + '"\n')
+            for true_tag in confusion_matrix:
+                f.write(f'"{true_tag}",')
+                for pred_tag in confusion_matrix[true_tag]:
+                    f.write(f'"{confusion_matrix[true_tag][pred_tag]}",')
+                f.write('\n')
+        
 
 def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False, pseudowords_threshold=0, build_confusion_matrix=False):
     """
@@ -395,13 +400,13 @@ def task_5(train_set, test_set):
     """
     """
     # Doing some analysis first, for choosing the pseudowords
-    # corpus_visualize_frequency_distribution(train_set)
-    # unique_words = corpus_get_unique_words(
-    #     train_set, threshold=1)
-    # with open("unique_words.txt", "w") as f:
-    #     for word in unique_words:
-    #         f.write(f'{word}\n')
-    bigram_hmm_experiment(train_set, test_set, add_one_smoothing=True, pseudowords_threshold=1)
+    corpus_visualize_frequency_distribution(train_set)
+    unique_words = corpus_get_unique_words(
+        train_set, threshold=1)
+    with open("unique_words.txt", "w") as f:
+        for word in unique_words:
+            f.write(f'{word}\n')
+    bigram_hmm_experiment(train_set, test_set, add_one_smoothing=True, pseudowords_threshold=1, build_confusion_matrix=True)
 
 def corpus_visualize_frequency_distribution(corpus):
     """
@@ -413,7 +418,7 @@ def corpus_visualize_frequency_distribution(corpus):
     for word in mlt.word_tag_counts:
         freqs.append(sum(mlt.word_tag_counts[word].values()))
 
-    bins = range(0, 11)
+    bins = range(1, 11)
     plt.hist(freqs, bins=bins)
     plt.xticks(bins)
     plt.xlabel('Frequency')
@@ -437,23 +442,20 @@ def main():
     train_set, test_set = get_dataset()
     
     ### Task B - Training a Most Likely Tag baseline
-    # print("Task 2 - Most Likely Tag")
-    # task_2(train_set, test_set)
+    print("Task 2 - Most Likely Tag")
+    task_2(train_set, test_set)
 
     ### Task C - Bigram HMM Tagger
-    # print("Task 3 - Bigram HMM Tagger")
-    # task_3(train_set, test_set)
+    print("Task 3 - Bigram HMM Tagger")
+    task_3(train_set, test_set)
 
     ### Task D - Bigram HMM Tagger with Add-One Smoothing
-    # print("Task 4 - Bigram HMM Tagger with Add-One Smoothing")
-    # task_4(train_set, test_set)
+    print("Task 4 - Bigram HMM Tagger with Add-One Smoothing")
+    task_4(train_set, test_set)
 
     ### Task C - Bigram HMM Tagger with Pseudowords
     print("Task 5 - Bigram HMM Tagger with Pseudowords")
     task_5(train_set, test_set)
-
-
-    
 
 if __name__ == '__main__':
     main()
