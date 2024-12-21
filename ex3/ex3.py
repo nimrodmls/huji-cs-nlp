@@ -28,6 +28,7 @@ class MostLikelyTag():
     def __init__(self):
         self.tag_count = {} # Count of each tag {tag: count}
         self.word_tag_counts = {} # Count of each word for each tag {word: {tag: count}}
+        self.vocab = set()
 
     def train(self, train_data):
         """
@@ -47,6 +48,8 @@ class MostLikelyTag():
         for word, tags in self.word_tag_counts.items():
             most_likely_tag = max(tags.items(), key=lambda x: x[1])[0]
             self.word_most_likely_tag[word] = most_likely_tag
+
+        self.vocab = set(self.word_tag_counts.keys())
 
     def predict(self, sentence):
         tags = []
@@ -95,7 +98,7 @@ class Bigram_HMM_Tagger():
                 return self.PSEDUOWORDS_SUFFIXES[suffix]
 
         # Checking for monetary values (e.g. 1,000.0)
-        is_monetary = True
+        is_monetary = False
         is_symboled = False
         for idx, ch in enumerate(word):
             # The first character can be a digit or a currency symbol
@@ -110,6 +113,8 @@ class Bigram_HMM_Tagger():
             elif not (ch.isdigit() or ch in [',', '.']):
                 is_monetary = False
                 break
+            elif ch in [',', '.']: # Expecting at least one comma or dot
+                is_monetary = True
         
         if is_monetary:
             return 'MonetaryValue'
@@ -126,10 +131,6 @@ class Bigram_HMM_Tagger():
         # Checking for all caps words (e.g. JOHN)
         if word.isupper():
             return 'AllCaps'
-        
-        # Checking for all lowercase (e.g. john)
-        if word.islower():
-            return 'AllLower'
 
         # Checking for initial caps (e.g. John)
         if word[0].isupper():
@@ -152,7 +153,7 @@ class Bigram_HMM_Tagger():
         mlt = MostLikelyTag()
         mlt.train(train_data)
 
-        self.vocab = set(mlt.word_tag_counts.keys())
+        self.vocab = mlt.vocab
 
         # Reversing the word_tag_count to tag_word_count
         for word in mlt.word_tag_counts:
@@ -285,17 +286,33 @@ def download_corpus():
     """
     nltk.download('brown')
 
-def sentence_count_correct_preds(y_true, y_pred):
+def sentence_count_correct_preds(x, y_true, y_pred, vocab, confusion_matrix=None):
     """
     """
-    correct_preds = 0
-    for true, pred in zip(y_true, y_pred):
-        if true == pred:
-            correct_preds += 1
+    correct_known_preds = 0
+    correct_unknown_preds = 0
+    total_known_preds = 0
+    total_unknown_preds = 0
 
-    return correct_preds
+    for word, true_tag, pred_tag in zip(x, y_true, y_pred):
+        # Counting the total predictions
+        if word in vocab:
+            total_known_preds += 1
+        else:
+            total_unknown_preds += 1
+        # Counting the correct predictions
+        if true_tag == pred_tag:
+            if word in vocab:
+                correct_known_preds += 1
+            else:
+                correct_unknown_preds += 1
+        # Building the confusion matrix
+        if confusion_matrix is not None:
+            confusion_matrix[true_tag][pred_tag] += 1
 
-def run_experiment(model, train_set, test_set):
+    return correct_known_preds, total_known_preds, correct_unknown_preds, total_unknown_preds
+
+def run_experiment(model, train_set, test_set, build_confusion_matrix=False):
     """
     """
     model.train(train_set)
@@ -312,19 +329,40 @@ def run_experiment(model, train_set, test_set):
         test_x.append(sent_words)
         test_y.append(sent_tags)
 
-    correct_preds = 0
-    total_preds = 0
+    total_correct_known = 0
+    total_known = 0
+    total_correct_unknown = 0
+    total_unknown = 0
+    
+    confusion_matrix = None
+    if build_confusion_matrix:
+        confusion_matrix = {tag1: {tag2: 0 for tag2 in model.emission_probs.keys()} for tag1 in model.emission_probs.keys()}
+
     for x, y in tqdm(list(zip(test_x, test_y))):
         y_pred = model.predict(x)
 
-        total_preds += len(y)
         # Ignoring the last word (STOP token)
-        correct_preds += sentence_count_correct_preds(y[:-1], y_pred[:-1])
+        correct_known, known, correct_unknown, unknown = \
+            sentence_count_correct_preds(x, y[:-1], y_pred[:-1], model.vocab, confusion_matrix)
+        total_correct_known += correct_known
+        total_known += known
+        total_correct_unknown += correct_unknown
+        total_unknown += unknown
 
-    accuracy = correct_preds / total_preds
-    print(f'Error rate: {1 - accuracy}')
+    print(f'Known words Error rate: {1 - (total_correct_known / total_known)}')
+    print(f'Unknown words Error rate: {1 - (total_correct_unknown / total_unknown)}')
+    print(f'Total Error rate: {1 - ((total_correct_known + total_correct_unknown) / (total_known + total_unknown))}')
 
-def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False, pseudowords_threshold=0):
+    if build_confusion_matrix:
+        print("Confusion Matrix:")
+        print('\t' + '\t'.join(confusion_matrix.keys()))
+        for tag1 in confusion_matrix:
+            print(tag1, end='\t')
+            for tag2 in confusion_matrix[tag1]:
+                print(confusion_matrix[tag1][tag2], end='\t')
+            print()
+
+def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False, pseudowords_threshold=0, build_confusion_matrix=False):
     """
     :param pseudowords_threshold: The frequency threshold to apply for pseudoword selection
                                   if this threshold is 0, pseudowords are not used
@@ -332,7 +370,7 @@ def bigram_hmm_experiment(train_set, test_set, add_one_smoothing=False, pseudowo
     bigram_hmm_model = Bigram_HMM_Tagger(
         add_one_smoothing=add_one_smoothing, 
         pseudowords_threshold=pseudowords_threshold)
-    run_experiment(bigram_hmm_model, train_set, test_set)
+    run_experiment(bigram_hmm_model, train_set, test_set, build_confusion_matrix=build_confusion_matrix)
 
 def task_2(train_set, test_set):
     """
@@ -359,11 +397,11 @@ def task_5(train_set, test_set):
     # Doing some analysis first, for choosing the pseudowords
     # corpus_visualize_frequency_distribution(train_set)
     # unique_words = corpus_get_unique_words(
-    #     train_set, threshold=3)
+    #     train_set, threshold=1)
     # with open("unique_words.txt", "w") as f:
     #     for word in unique_words:
     #         f.write(f'{word}\n')
-    bigram_hmm_experiment(train_set, test_set, add_one_smoothing=True, pseudowords_threshold=2)
+    bigram_hmm_experiment(train_set, test_set, add_one_smoothing=True, pseudowords_threshold=1)
 
 def corpus_visualize_frequency_distribution(corpus):
     """
@@ -372,8 +410,8 @@ def corpus_visualize_frequency_distribution(corpus):
     mlt.train(corpus)
 
     freqs = []
-    for word in mlt.word_tag_count:
-        freqs.append(sum(mlt.word_tag_count[word].values()))
+    for word in mlt.word_tag_counts:
+        freqs.append(sum(mlt.word_tag_counts[word].values()))
 
     bins = range(0, 11)
     plt.hist(freqs, bins=bins)
@@ -390,7 +428,7 @@ def corpus_get_unique_words(corpus, threshold=5):
     """
     mlt = MostLikelyTag()
     mlt.train(corpus)
-    unique_words = [word for word in mlt.word_tag_count if sum(mlt.word_tag_count[word].values()) <= threshold]
+    unique_words = [word for word in mlt.word_tag_counts if sum(mlt.word_tag_counts[word].values()) <= threshold]
     return unique_words
 
 def main():
@@ -399,16 +437,20 @@ def main():
     train_set, test_set = get_dataset()
     
     ### Task B - Training a Most Likely Tag baseline
-    task_2(train_set, test_set)
+    # print("Task 2 - Most Likely Tag")
+    # task_2(train_set, test_set)
 
     ### Task C - Bigram HMM Tagger
-    task_3(train_set, test_set)
+    # print("Task 3 - Bigram HMM Tagger")
+    # task_3(train_set, test_set)
 
     ### Task D - Bigram HMM Tagger with Add-One Smoothing
+    # print("Task 4 - Bigram HMM Tagger with Add-One Smoothing")
     # task_4(train_set, test_set)
 
     ### Task C - Bigram HMM Tagger with Pseudowords
-    # task_5(train_set, test_set)
+    print("Task 5 - Bigram HMM Tagger with Pseudowords")
+    task_5(train_set, test_set)
 
 
     
