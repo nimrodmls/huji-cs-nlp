@@ -25,6 +25,12 @@ def get_sentiment_class_from_val(sentiment_val: float):
         return POSITIVE_SENTIMENT
     else:
         return NEUTRAL_SENTIMENT
+    
+def get_sentiment_class_from_tensor(sentiments):
+    sentiments[sentiments <= 0.4] = NEGATIVE_SENTIMENT
+    sentiments[sentiments >= 0.6] = POSITIVE_SENTIMENT
+    sentiments[(sentiments > 0.4) & (sentiments < 0.6)] = NEUTRAL_SENTIMENT
+    return sentiments
 
 class SentimentTreeNode(object):
     def __init__(self, text: list, sentiment_val: float, min_token_idx: int, children=[], parent=None):

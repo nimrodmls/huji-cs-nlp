@@ -35,6 +35,7 @@ def get_available_device():
     """
     return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+device = get_available_device()
 
 def save_pickle(obj, path):
     with open(path, "wb") as f:
@@ -330,8 +331,27 @@ def train_epoch(model, data_iterator, optimizer, criterion):
     :param optimizer: the optimizer object for the training process.
     :param criterion: the criterion object for the training process.
     """
+    pred_correct = 0
+    ep_loss = 0.
 
-    return
+    for i, (inputs, labels) in enumerate(tqdm(data_iterator)):
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        optimizer.zero_grad()
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        
+        pred_correct += (outputs.argmax(dim=1) == labels).sum().item()
+        ep_loss += loss.item()
+
+    test_accuracies.append(test_model(model, testloader))
+
+    accuracies.append(pred_correct / len(trainloader.dataset))
+    losses.append(ep_loss / len(trainloader))
 
 
 def evaluate(model, data_iterator, criterion):
@@ -368,6 +388,7 @@ def train_model(model, data_manager, n_epochs, lr, weight_decay=0.):
     :param lr: learning rate to be used for optimization
     :param weight_decay: parameter for l2 regularization
     """
+    model.train()
     return
 
 
