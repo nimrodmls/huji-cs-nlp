@@ -115,7 +115,8 @@ def get_w2v_average(sent, word_to_vec, embedding_dim):
     :param embedding_dim: the dimension of the word embedding vectors
     :return The average embedding vector as numpy ndarray.
     """
-    return
+    embeddings = sentence_to_embedding(sent, word_to_vec, SEQ_LEN, embedding_dim)
+    return np.mean(embeddings, axis=0)
 
 
 def get_one_hot(size, ind):
@@ -125,7 +126,9 @@ def get_one_hot(size, ind):
     :param ind: the entry index to turn to 1
     :return: numpy ndarray which represents the one-hot vector
     """
-    return
+    vec = np.zeros(shape=size)
+    vec[ind] = 1
+    return vec
 
 
 def average_one_hots(sent, word_to_ind):
@@ -136,7 +139,11 @@ def average_one_hots(sent, word_to_ind):
     :param word_to_ind: a mapping between words to indices
     :return:
     """
-    return
+    vec = np.zeros(shape=(len(word_to_ind)))
+    for word in sent.text:
+        if word in word_to_ind:
+            vec += get_one_hot(len(word_to_ind), word_to_ind[word])
+    return vec / len(sent.text) # normalize by the number of words in the sentence
 
 
 def get_word_to_ind(words_list):
@@ -146,7 +153,7 @@ def get_word_to_ind(words_list):
     :param words_list: a list of words
     :return: the dictionary mapping words to the index
     """
-    return
+    return {word: ind for ind, word in enumerate(words_list)}
 
 
 def sentence_to_embedding(sent, word_to_vec, seq_len, embedding_dim=300):
@@ -159,7 +166,10 @@ def sentence_to_embedding(sent, word_to_vec, seq_len, embedding_dim=300):
     :param embedding_dim: the dimension of the w2v embedding
     :return: numpy ndarray of shape (seq_len, embedding_dim) with the representation of the sentence
     """
-    return
+    embeddings = np.zeros(shape=(seq_len, embedding_dim))
+    for idx, word in enumerate(sent.text[:seq_len]):
+        embeddings[idx] = word_to_vec[word]
+    return embeddings
 
 
 class OnlineDataset(Dataset):
@@ -384,6 +394,12 @@ def train_lstm_with_w2v():
 
 
 if __name__ == '__main__':
-    train_log_linear_with_one_hot()
+    data_manager = DataManager()
+    iter = data_manager.get_torch_iterator()
+    for x, y in iter:
+        print(x.shape)
+        print(y)
+
+    # train_log_linear_with_one_hot()
     # train_log_linear_with_w2v()
     # train_lstm_with_w2v()
