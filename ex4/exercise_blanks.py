@@ -282,6 +282,7 @@ class DataManager():
 class LSTM(nn.Module):
     """
     An LSTM for sentiment analysis with architecture as described in the exercise description.
+    The model is implemented using PyTorch's nn.LSTM module.
     """
     def __init__(self, embedding_dim, hidden_dim, n_layers, dropout):
         return
@@ -298,18 +299,19 @@ class LogLinear(nn.Module):
     general class for the log-linear models for sentiment analysis.
     """
     def __init__(self, embedding_dim):
-        return
+        self.model = nn.Sequential(
+            nn.Linear(embedding_dim, 1))
 
     def forward(self, x):
-        return
+        return self.model(x)
 
     def predict(self, x):
-        return
+        return torch.argmax(self.forward(x), dim=1)
 
 
 # ------------------------- training functions -------------
 
-
+# TODO: This should probably be removed later
 def binary_accuracy(preds, y):
     """
     This method returns tha accuracy of the predictions, relative to the labels.
@@ -318,8 +320,7 @@ def binary_accuracy(preds, y):
     :param y: a vector of true labels
     :return: scalar value - (<number of accurate predictions> / <number of examples>)
     """
-
-    return
+    return (preds == y).sum().item() / len(y)
 
 
 def train_epoch(model, data_iterator, optimizer, criterion):
@@ -330,9 +331,10 @@ def train_epoch(model, data_iterator, optimizer, criterion):
     :param data_iterator: an iterator, iterating over the training data for the model.
     :param optimizer: the optimizer object for the training process.
     :param criterion: the criterion object for the training process.
+    :return: tuple of (loss, accuracy) for the epoch.
     """
     pred_correct = 0
-    ep_loss = 0.
+    accumulated_loss = 0.
 
     for i, (inputs, labels) in enumerate(tqdm(data_iterator)):
         inputs = inputs.to(device)
@@ -344,14 +346,14 @@ def train_epoch(model, data_iterator, optimizer, criterion):
         loss.backward()
         optimizer.step()
 
-        
-        pred_correct += (outputs.argmax(dim=1) == labels).sum().item()
-        ep_loss += loss.item()
+        preds = data_loader.get_sentiment_class_from_tensor(outputs)
+        pred_correct += (preds == labels).sum().item()
+        accumulated_loss += loss.item()
 
-    test_accuracies.append(test_model(model, testloader))
+    ep_accuracy = pred_correct / len(data_iterator.dataset)
+    ep_loss = accumulated_loss / len(data_iterator)
 
-    accuracies.append(pred_correct / len(trainloader.dataset))
-    losses.append(ep_loss / len(trainloader))
+    return ep_loss, ep_accuracy
 
 
 def evaluate(model, data_iterator, criterion):
@@ -362,7 +364,25 @@ def evaluate(model, data_iterator, criterion):
     :param criterion: the loss criterion used for evaluation
     :return: tuple of (average loss over all examples, average accuracy over all examples)
     """
-    return
+    model.eval()
+    with torch.no_grad():
+        pred_correct = 0
+        accumulated_loss = 0.
+        
+        for i, (inputs, labels) in enumerate(tqdm(data_iterator)):
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+
+            preds = data_loader.get_sentiment_class_from_tensor(outputs)
+            pred_correct += (preds == labels).sum().item()
+            accumulated_loss += loss.item()
+
+        accuracy = pred_correct / len(data_iterator.dataset)
+        loss = accumulated_loss / len(data_iterator)
+        
+        return loss, accuracy
 
 
 def get_predictions_for_data(model, data_iter):
@@ -389,14 +409,24 @@ def train_model(model, data_manager, n_epochs, lr, weight_decay=0.):
     :param weight_decay: parameter for l2 regularization
     """
     model.train()
-    return
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    criterion = nn.BCEWithLogitsLoss()
+
+    for ep in range(n_epochs):
+        print(f"Epoch {ep}")
+        train_loss, train_accuracy = train_epoch(model, data_manager.get_torch_iterator(), optimizer, criterion)
+        val_loss, val_accuracy = evaluate(model, data_manager.get_torch_iterator(data_subset=VAL), criterion)
+        print(f"Epoch {ep}: Train loss {train_loss:.4f}, Train acc {train_accuracy:.4f}, Val loss {val_loss:.4f}, Val acc {val_accuracy:.4f}")
 
 
 def train_log_linear_with_one_hot():
     """
     Here comes your code for training and evaluation of the log linear model with one hot representation.
     """
-    return
+    dm = DataManager(data_type=ONEHOT_AVERAGE)
+    model = LogLinear(dm.get_input_shape()[0])
+    train_model(model, dm, 10, 0.001)
 
 
 def train_log_linear_with_w2v():
@@ -415,12 +445,12 @@ def train_lstm_with_w2v():
 
 
 if __name__ == '__main__':
-    data_manager = DataManager()
-    iter = data_manager.get_torch_iterator()
-    for x, y in iter:
-        print(x.shape)
-        print(y)
+    # data_manager = DataManager()
+    # iter = data_manager.get_torch_iterator()
+    # for x, y in iter:
+    #     print(x.shape)
+    #     print(y)
 
-    # train_log_linear_with_one_hot()
+    train_log_linear_with_one_hot()
     # train_log_linear_with_w2v()
     # train_lstm_with_w2v()
