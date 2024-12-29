@@ -298,7 +298,7 @@ class LSTM(nn.Module):
 
     def forward(self, text):
         output, (h_n, c_n) = self.model(text)
-        return self.linear(torch.hstack([h_n[0], h_n[1]]))
+        return self.linear(torch.hstack([h_n[0], h_n[1]])) # Passing concatenated output
 
     def predict(self, text):
         return
@@ -490,12 +490,6 @@ def train_lstm_with_w2v():
 
 
 if __name__ == '__main__':
-    # data_manager = DataManager()
-    # iter = data_manager.get_torch_iterator()
-    # for x, y in iter:
-    #     print(x.shape)
-    #     print(y)
-
     # train_log_linear_with_one_hot()
     # train_log_linear_with_w2v()
     train_lstm_with_w2v()
