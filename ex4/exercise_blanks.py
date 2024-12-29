@@ -284,13 +284,21 @@ class DataManager():
 class LSTM(nn.Module):
     """
     An LSTM for sentiment analysis with architecture as described in the exercise description.
-    The model is implemented using PyTorch's nn.LSTM module.
+    The LSTM is bidirectional. The model is implemented using PyTorch's nn.LSTM module.
     """
     def __init__(self, embedding_dim, hidden_dim, n_layers, dropout):
-        return
+        super(LSTM, self).__init__()
+        # LSTM Model - Note that it is bidirectional, and that batch_first is set to True
+        # since this is the way we are passing the data into forward
+        # (meaning the shape of the text is (batch_size, seq_len, embedding_dim))
+        self.model = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_dim, num_layers=n_layers,
+                             dropout=dropout, bidirectional=True, batch_first=True)
+        # LSTM is bidirectional, so we multiply by 2 to support concatenation
+        self.linear = nn.Linear(hidden_dim * 2, 1)
 
     def forward(self, text):
-        return
+        output, (h_n, c_n) = self.model(text)
+        return self.linear(torch.hstack([h_n[0], h_n[1]]))
 
     def predict(self, text):
         return
@@ -336,6 +344,8 @@ def train_epoch(model, data_iterator, optimizer, criterion):
     :param criterion: the criterion object for the training process.
     :return: tuple of (loss, accuracy) for the epoch.
     """
+    model.train()
+
     pred_correct = 0
     accumulated_loss = 0.
 
@@ -413,8 +423,6 @@ def train_model(model, data_manager, n_epochs, lr, weight_decay=0.):
     :param lr: learning rate to be used for optimization
     :param weight_decay: parameter for l2 regularization
     """
-    model.train()
-
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     criterion = nn.BCEWithLogitsLoss()
 
@@ -463,7 +471,22 @@ def train_lstm_with_w2v():
     """
     Here comes your code for training and evaluation of the LSTM model.
     """
-    return
+    # Learning Parameters (as defined in the exercise)
+    batch_size = 64
+    lr = 0.001
+    weight_decay = 0.0001
+    n_epochs = 4
+    embedding_dim = 300
+
+    # Hyperparameters for the LSTM model
+    hidden_dim = 128
+    n_layers = 1
+    dropout = 0.5
+
+    dm = DataManager(data_type=W2V_SEQUENCE, batch_size=batch_size, embedding_dim=embedding_dim)
+    model = LSTM(embedding_dim, hidden_dim, n_layers, dropout)
+    model.to(device)
+    train_model(model, dm, n_epochs=n_epochs, lr=lr, weight_decay=weight_decay)
 
 
 if __name__ == '__main__':
@@ -474,5 +497,5 @@ if __name__ == '__main__':
     #     print(y)
 
     # train_log_linear_with_one_hot()
-    train_log_linear_with_w2v()
-    # train_lstm_with_w2v()
+    # train_log_linear_with_w2v()
+    train_lstm_with_w2v()
