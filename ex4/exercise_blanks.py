@@ -169,7 +169,9 @@ def sentence_to_embedding(sent, word_to_vec, seq_len, embedding_dim=300):
     """
     embeddings = torch.zeros(size=(seq_len, embedding_dim))
     for idx, word in enumerate(sent.text[:seq_len]):
-        embeddings[idx] = word_to_vec[word]
+        if word in word_to_vec:
+            embeddings[idx] = torch.from_numpy(word_to_vec[word])
+        # else - if the word is not in the w2v dict, we leave the zero vector
     return embeddings
 
 
@@ -236,13 +238,13 @@ class DataManager():
             self.sent_func = sentence_to_embedding
 
             self.sent_func_kwargs = {"seq_len": SEQ_LEN,
-                                     "word_to_vec": create_or_load_slim_w2v(words_list),
+                                     "word_to_vec": create_or_load_slim_w2v(words_list, cache_w2v=True),
                                      "embedding_dim": embedding_dim
                                      }
         elif data_type == W2V_AVERAGE:
             self.sent_func = get_w2v_average
             words_list = list(self.sentiment_dataset.get_word_counts().keys())
-            self.sent_func_kwargs = {"word_to_vec": create_or_load_slim_w2v(words_list),
+            self.sent_func_kwargs = {"word_to_vec": create_or_load_slim_w2v(words_list, cache_w2v=True),
                                      "embedding_dim": embedding_dim
                                      }
         else:
@@ -444,7 +446,17 @@ def train_log_linear_with_w2v():
     Here comes your code for training and evaluation of the log linear model with word embeddings
     representation.
     """
-    return
+    # Learning Parameters (as defined in the exercise)
+    batch_size = 64
+    lr = 0.01
+    weight_decay = 0.001
+    n_epochs = 20
+    embedding_dim = 300
+
+    dm = DataManager(data_type=W2V_AVERAGE, batch_size=batch_size, embedding_dim=embedding_dim)
+    model = LogLinear(dm.get_input_shape()[0])
+    model.to(device)
+    train_model(model, dm, n_epochs=n_epochs, lr=lr, weight_decay=weight_decay)
 
 
 def train_lstm_with_w2v():
@@ -461,6 +473,6 @@ if __name__ == '__main__':
     #     print(x.shape)
     #     print(y)
 
-    train_log_linear_with_one_hot()
-    # train_log_linear_with_w2v()
+    # train_log_linear_with_one_hot()
+    train_log_linear_with_w2v()
     # train_lstm_with_w2v()
