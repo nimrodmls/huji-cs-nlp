@@ -343,7 +343,8 @@ def train_epoch(model, data_iterator, optimizer, criterion):
 
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs.squeeze(), labels)
+        outputs = outputs.squeeze()
+        loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
 
@@ -374,6 +375,7 @@ def evaluate(model, data_iterator, criterion):
             inputs = inputs.to(device)
             labels = labels.to(device)
             outputs = model(inputs)
+            outputs = outputs.squeeze()
             loss = criterion(outputs, labels)
 
             preds = data_loader.get_sentiment_class_from_tensor(outputs)
@@ -415,20 +417,26 @@ def train_model(model, data_manager, n_epochs, lr, weight_decay=0.):
     criterion = nn.BCEWithLogitsLoss()
 
     for ep in range(n_epochs):
-        print(f"Epoch {ep}")
+        print(f"Epoch {ep+1}")
         train_loss, train_accuracy = train_epoch(model, data_manager.get_torch_iterator(), optimizer, criterion)
         val_loss, val_accuracy = evaluate(model, data_manager.get_torch_iterator(data_subset=VAL), criterion)
-        print(f"Epoch {ep}: Train loss {train_loss:.4f}, Train acc {train_accuracy:.4f}, Val loss {val_loss:.4f}, Val acc {val_accuracy:.4f}")
+        print(f"Epoch {ep+1}: Train loss {train_loss:.4f}, Train acc {train_accuracy:.4f}, Val loss {val_loss:.4f}, Val acc {val_accuracy:.4f}")
 
 
 def train_log_linear_with_one_hot():
     """
     Here comes your code for training and evaluation of the log linear model with one hot representation.
     """
-    dm = DataManager(data_type=ONEHOT_AVERAGE)
+    # Learning Parameters (as defined in the exercise)
+    batch_size = 64
+    lr = 0.01
+    weight_decay = 0.001
+    n_epochs = 20
+
+    dm = DataManager(data_type=ONEHOT_AVERAGE, batch_size=batch_size)
     model = LogLinear(dm.get_input_shape()[0])
     model.to(device)
-    train_model(model, dm, 10, 0.001)
+    train_model(model, dm, n_epochs=n_epochs, lr=lr, weight_decay=weight_decay)
 
 
 def train_log_linear_with_w2v():
