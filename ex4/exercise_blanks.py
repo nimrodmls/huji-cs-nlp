@@ -116,7 +116,7 @@ def get_w2v_average(sent, word_to_vec, embedding_dim):
     :param embedding_dim: the dimension of the word embedding vectors
     :return The average embedding vector as numpy ndarray.
     """
-    embeddings = sentence_to_embedding(sent, word_to_vec, SEQ_LEN, embedding_dim)
+    embeddings = sentence_to_embedding(sent, word_to_vec, len(sent.text), embedding_dim)
     return torch.mean(embeddings, dim=0)
 
 
