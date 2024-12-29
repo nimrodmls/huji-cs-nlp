@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, TensorDataset, Dataset
 import operator
 import data_loader
 import pickle
-import tqdm
+from tqdm import tqdm
 
 # ------------------------------------------- Constants ----------------------------------------
 
@@ -117,7 +117,7 @@ def get_w2v_average(sent, word_to_vec, embedding_dim):
     :return The average embedding vector as numpy ndarray.
     """
     embeddings = sentence_to_embedding(sent, word_to_vec, SEQ_LEN, embedding_dim)
-    return np.mean(embeddings, axis=0)
+    return torch.mean(embeddings, dim=0)
 
 
 def get_one_hot(size, ind):
@@ -127,7 +127,7 @@ def get_one_hot(size, ind):
     :param ind: the entry index to turn to 1
     :return: numpy ndarray which represents the one-hot vector
     """
-    vec = np.zeros(shape=size)
+    vec = torch.zeros(size=(size,))
     vec[ind] = 1
     return vec
 
@@ -140,7 +140,7 @@ def average_one_hots(sent, word_to_ind):
     :param word_to_ind: a mapping between words to indices
     :return:
     """
-    vec = np.zeros(shape=(len(word_to_ind)))
+    vec = torch.zeros(size=(len(word_to_ind),))
     for word in sent.text:
         if word in word_to_ind:
             vec += get_one_hot(len(word_to_ind), word_to_ind[word])
@@ -167,7 +167,7 @@ def sentence_to_embedding(sent, word_to_vec, seq_len, embedding_dim=300):
     :param embedding_dim: the dimension of the w2v embedding
     :return: numpy ndarray of shape (seq_len, embedding_dim) with the representation of the sentence
     """
-    embeddings = np.zeros(shape=(seq_len, embedding_dim))
+    embeddings = torch.zeros(size=(seq_len, embedding_dim))
     for idx, word in enumerate(sent.text[:seq_len]):
         embeddings[idx] = word_to_vec[word]
     return embeddings
@@ -299,6 +299,7 @@ class LogLinear(nn.Module):
     general class for the log-linear models for sentiment analysis.
     """
     def __init__(self, embedding_dim):
+        super(LogLinear, self).__init__()
         self.model = nn.Sequential(
             nn.Linear(embedding_dim, 1))
 
@@ -342,7 +343,7 @@ def train_epoch(model, data_iterator, optimizer, criterion):
 
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs, labels)
+        loss = criterion(outputs.squeeze(), labels)
         loss.backward()
         optimizer.step()
 
@@ -426,6 +427,7 @@ def train_log_linear_with_one_hot():
     """
     dm = DataManager(data_type=ONEHOT_AVERAGE)
     model = LogLinear(dm.get_input_shape()[0])
+    model.to(device)
     train_model(model, dm, 10, 0.001)
 
 
