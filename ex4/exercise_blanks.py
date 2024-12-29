@@ -360,7 +360,7 @@ def train_epoch(model, data_iterator, optimizer, criterion):
         loss.backward()
         optimizer.step()
 
-        preds = data_loader.get_sentiment_class_from_tensor(outputs)
+        preds = data_loader.get_sentiment_class_from_logits(outputs)
         pred_correct += (preds == labels).sum().item()
         accumulated_loss += loss.item()
 
@@ -390,7 +390,7 @@ def evaluate(model, data_iterator, criterion):
             outputs = outputs.squeeze()
             loss = criterion(outputs, labels)
 
-            preds = data_loader.get_sentiment_class_from_tensor(outputs)
+            preds = data_loader.get_sentiment_class_from_logits(outputs)
             pred_correct += (preds == labels).sum().item()
             accumulated_loss += loss.item()
 

@@ -121,24 +121,29 @@ def transformer_classification():
             loss.backward()
             optimizer.step()
 
-            preds = data_loader.get_sentiment_class_from_tensor(logits)
+            preds = data_loader.get_sentiment_class_from_logits(logits)
             pred_correct += (preds == labels).sum().item()
             total_loss += loss.item()
         
-        print(f"Accuracy: {pred_correct / len(data_iterator.dataset)}")
+        print(f"TRAIN Accuracy: {pred_correct / len(data_iterator.dataset)}")
         return total_loss / len(data_iterator)
 
-    def evaluate_model(model, data_loader, metric=None):
+    def evaluate_model(model, data_iterator):
         model.eval()
-        for batch in tqdm(data_loader):
+        pred_correct = 0
+        for batch in tqdm(data_iterator):
             with torch.no_grad():
                 input_ids = batch['input_ids'].to(device)
                 attention_mask = batch['attention_mask'].to(device)
                 labels = batch['labels'].to(device)
                 
                 outputs = model(input_ids, attention_mask=attention_mask)
-                if metric is not None:
-                    metric.add_batch(predictions=nn.functional.softmax(outputs.logits, dim=1).argmax(dim=1), references=labels)
+                logits = outputs.logits.squeeze()
+
+                preds = data_loader.get_sentiment_class_from_logits(logits)
+                pred_correct += (preds == labels).sum().item()
+
+        print(f"VAL Accuracy: {pred_correct / len(data_iterator.dataset)}")
 
     # Parameters
     epochs = 3
@@ -148,7 +153,6 @@ def transformer_classification():
     # Model, tokenizer, and metric
     model = AutoModelForSequenceClassification.from_pretrained(
         'distilroberta-base', num_labels=1).to(device)
-    metric = evaluate.load("accuracy")
     dm = DataManager(batch_size=batch_size)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -163,7 +167,7 @@ def transformer_classification():
         loss = train_epoch(model, dm.get_torch_iterator(), optimizer, criterion)
         train_loss.append(loss)
 
-        # evaluate_model(model, dm.get_torch_iterator(data_subset=VAL), metric)
+        evaluate_model(model, dm.get_torch_iterator(data_subset=VAL))
         # val_accuracy.append(metric.compute()['accuracy'])
 
 transformer_classification()

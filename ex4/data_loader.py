@@ -1,6 +1,6 @@
 import os
 import random
-
+from torch import nn
 
 POSITIVE_SENTIMENT = 1.
 NEGATIVE_SENTIMENT = 0.
@@ -26,11 +26,13 @@ def get_sentiment_class_from_val(sentiment_val: float):
     else:
         return NEUTRAL_SENTIMENT
     
-def get_sentiment_class_from_tensor(sentiments):
-    sentiments[sentiments <= 0.4] = NEGATIVE_SENTIMENT
-    sentiments[sentiments >= 0.6] = POSITIVE_SENTIMENT
-    sentiments[(sentiments > 0.4) & (sentiments < 0.6)] = NEUTRAL_SENTIMENT
-    return sentiments
+def get_sentiment_class_from_logits(sentiments):
+    sentiments_prob = nn.Sigmoid()(sentiments)
+    preds = sentiments_prob.clone()
+    preds[sentiments_prob <= 0.4] = NEGATIVE_SENTIMENT
+    preds[sentiments_prob >= 0.6] = POSITIVE_SENTIMENT
+    preds[(sentiments_prob > 0.4) & (sentiments_prob < 0.6)] = NEUTRAL_SENTIMENT
+    return preds
 
 class SentimentTreeNode(object):
     def __init__(self, text: list, sentiment_val: float, min_token_idx: int, children=[], parent=None):
