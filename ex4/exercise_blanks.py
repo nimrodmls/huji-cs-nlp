@@ -397,7 +397,9 @@ def evaluate(model, data_iterator, criterion=None):
 
             preds = data_loader.get_sentiment_class_from_logits(outputs)
             pred_correct += (preds == labels).sum().item()
-            accumulated_loss += loss.item()
+
+            if None != criterion:
+                accumulated_loss += loss.item()
 
         accuracy = pred_correct / len(data_iterator.dataset)
         loss = accumulated_loss / len(data_iterator)
@@ -453,24 +455,24 @@ def test_model(model, data_manager):
     Tests the given model with the regular subset & special subsets (rare words & negations)
     """
     # Testing the full subset
-    test_loss, test_accuracy = evaluate(model, data_manager.get_torch_iterator(data_subset=TEST))
-    print(f"Full Subset: Test loss {test_loss:.4f}, Test acc {test_accuracy:.4f}")
+    _, test_accuracy = evaluate(model, data_manager.get_torch_iterator(data_subset=TEST))
+    print(f"Full Subset Test Accuracy: {test_accuracy:.4f}")
 
     # Testing the negated polarity subset
     negated_indices = data_loader.get_negated_polarity_examples(data_manager.sentences[TEST])
     subest_sents = [data_manager.sentences[TEST][i] for i in negated_indices]
     iterator = DataLoader(OnlineDataset(subest_sents, data_manager.sent_func, data_manager.sent_func_kwargs),
                           batch_size=50, shuffle=False)
-    test_loss, test_accuracy = evaluate(model, iterator)
-    print(f"Negated Polarity: Test loss {test_loss:.4f}, Test acc {test_accuracy:.4f}")
+    _, test_accuracy = evaluate(model, iterator)
+    print(f"Negated Polarity Test Accuracy: {test_accuracy:.4f}")
 
     # Testing the rare words subset
-    rare_indices = data_loader.get_rare_words_examples(data_manager.sentences[TEST])
+    rare_indices = data_loader.get_rare_words_examples(data_manager.sentences[TEST], data_manager.sentiment_dataset)
     subest_sents = [data_manager.sentences[TEST][i] for i in rare_indices]
     iterator = DataLoader(OnlineDataset(subest_sents, data_manager.sent_func, data_manager.sent_func_kwargs),
                           batch_size=50, shuffle=False)
-    test_loss, test_accuracy = evaluate(model, iterator)
-    print(f"Rare Words: Test loss {test_loss:.4f}, Test acc {test_accuracy:.4f}")
+    _, test_accuracy = evaluate(model, iterator)
+    print(f"Rare Words Test Accuracy: {test_accuracy:.4f}")
 
 
 def plot_results(experiment_name, train_accuracies, val_accuracies, train_losses, val_losses):
@@ -530,6 +532,7 @@ def train_log_linear_with_one_hot(load_pretrained=False):
     if load_pretrained:
         model = LogLinear(dm.get_input_shape()[0])
         model.load_state_dict(torch.load('log_linear_one_hot.pth'))
+        model.to(device)
     else:
         model = LogLinear(dm.get_input_shape()[0])
         model.to(device)
@@ -559,6 +562,7 @@ def train_log_linear_with_w2v(load_pretrained=False):
     if load_pretrained:
         model = LogLinear(dm.get_input_shape()[0])
         model.load_state_dict(torch.load('log_linear_w2v.pth'))
+        model.to(device)
     else:
         model = LogLinear(dm.get_input_shape()[0])
         model.to(device)
@@ -593,6 +597,7 @@ def train_lstm_with_w2v(load_pretrained=False):
     if load_pretrained:
         model = LSTM(embedding_dim, hidden_dim, n_layers, dropout)
         model.load_state_dict(torch.load('lstm_w2v.pth'))
+        model.to(device)
     else:
         model = LSTM(embedding_dim, hidden_dim, n_layers, dropout)
         model.to(device)
@@ -607,5 +612,5 @@ def train_lstm_with_w2v(load_pretrained=False):
 
 if __name__ == '__main__':
     # train_log_linear_with_one_hot()
-    train_log_linear_with_w2v()
+    train_log_linear_with_w2v(load_pretrained=True)
     # train_lstm_with_w2v()
