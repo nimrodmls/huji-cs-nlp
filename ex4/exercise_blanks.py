@@ -488,6 +488,7 @@ def plot_results(experiment_name, train_accuracies, val_accuracies, train_losses
     plt.plot(epochs, train_accuracies, label='Train')
     plt.plot(epochs, val_accuracies, label='Validation')
     plt.title('Accuracy')
+    plt.xticks(epochs)
     plt.legend()
     plt.savefig(f'{experiment_name}_accuracy.png')
 
@@ -495,6 +496,7 @@ def plot_results(experiment_name, train_accuracies, val_accuracies, train_losses
     plt.plot(epochs, train_losses, label='Train')
     plt.plot(epochs, val_losses, label='Validation')
     plt.title('Loss')
+    plt.xticks(epochs)
     plt.legend()
     plt.savefig(f'{experiment_name}_loss.png')
 
@@ -539,6 +541,7 @@ def log_linear_with_one_hot(load_pretrained=False):
         train_accuracies, val_accuracies, train_losses, val_losses = \
             train_model(model, dm, n_epochs=n_epochs, lr=lr, weight_decay=weight_decay)
         torch.save(model.state_dict(), 'log_linear_one_hot.pth')
+
         save_results('log_linear_one_hot', train_accuracies, val_accuracies, train_losses, val_losses)
         plot_results('log_linear_one_hot', train_accuracies, val_accuracies, train_losses, val_losses)
 
@@ -571,7 +574,7 @@ def log_linear_with_w2v(load_pretrained=False):
         torch.save(model.state_dict(), 'log_linear_w2v.pth')
             
         save_results('log_linear_w2v', train_accuracies, val_accuracies, train_losses, val_losses)
-        plot_results('log_linear_one_hot', train_accuracies, val_accuracies, train_losses, val_losses)
+        plot_results('log_linear_w2v', train_accuracies, val_accuracies, train_losses, val_losses)
 
     test_model(model, dm)
 
@@ -604,16 +607,28 @@ def lstm_with_w2v(load_pretrained=False):
         train_accuracies, val_accuracies, train_losses, val_losses = \
             train_model(model, dm, n_epochs=n_epochs, lr=lr, weight_decay=weight_decay)
         torch.save(model.state_dict(), 'lstm_w2v.pth')
+
         save_results('lstm_w2v', train_accuracies, val_accuracies, train_losses, val_losses)
-        plot_results('log_linear_one_hot', train_accuracies, val_accuracies, train_losses, val_losses)
+        plot_results('lstm_w2v', train_accuracies, val_accuracies, train_losses, val_losses)
 
     test_model(model, dm)
+
+def plot_from_saved_results(experiment_name):
+    """
+    Plot the results of the experiment from the saved pickle file
+    """
+    results = load_results(experiment_name)
+    plot_results(experiment_name, results['train_accuracies'], results['val_accuracies'], results['train_losses'], results['val_losses'])
 
 if __name__ == '__main__':
     # Setting seeds for reproducibility
     torch.manual_seed(42)
     np.random.seed(42)
-
+    
     log_linear_with_one_hot(load_pretrained=False)
     log_linear_with_w2v(load_pretrained=False)
     lstm_with_w2v(load_pretrained=False)
+
+    # plot_from_saved_results('log_linear_one_hot')
+    # plot_from_saved_results('log_linear_w2v')
+    # plot_from_saved_results('lstm_w2v')
