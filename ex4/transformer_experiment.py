@@ -146,15 +146,16 @@ def transformer_classification():
         print(f"VAL Accuracy: {pred_correct / len(data_iterator.dataset)}")
 
     # Parameters
-    epochs = 3
+    epochs = 2
     batch_size = 64
-    learning_rate = 5e-5
+    learning_rate = 1e-5
 
     # Model, tokenizer, and metric
     model = AutoModelForSequenceClassification.from_pretrained(
         'distilroberta-base', num_labels=1).to(device)
     dm = DataManager(batch_size=batch_size)
 
+    # Weight decay is defaulted to 0 (as the exercise requires)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     criterion = torch.nn.BCEWithLogitsLoss().to(device)
 

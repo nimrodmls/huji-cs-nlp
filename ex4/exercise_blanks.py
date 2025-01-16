@@ -9,6 +9,7 @@ import operator
 import data_loader
 import pickle
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # ------------------------------------------- Constants ----------------------------------------
 
@@ -370,7 +371,7 @@ def train_epoch(model, data_iterator, optimizer, criterion):
     return ep_loss, ep_accuracy
 
 
-def evaluate(model, data_iterator, criterion):
+def evaluate(model, data_iterator, criterion=None):
     """
     evaluate the model performance on the given data
     :param model: one of our models..
@@ -388,7 +389,11 @@ def evaluate(model, data_iterator, criterion):
             labels = labels.to(device)
             outputs = model(inputs)
             outputs = outputs.squeeze()
-            loss = criterion(outputs, labels)
+
+            # Calculate loss if criterion is given - It is not mandatory 
+            loss = 0
+            if None != criterion:
+                loss = criterion(outputs, labels)
 
             preds = data_loader.get_sentiment_class_from_logits(outputs)
             pred_correct += (preds == labels).sum().item()
@@ -425,6 +430,9 @@ def train_model(model, data_manager, n_epochs, lr, weight_decay=0.):
     """
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     criterion = nn.BCEWithLogitsLoss()
+    
+    train_accuracies, val_accuracies = [], []
+    train_losses, val_losses = [], []
 
     for ep in range(n_epochs):
         print(f"Epoch {ep+1}")
@@ -432,8 +440,82 @@ def train_model(model, data_manager, n_epochs, lr, weight_decay=0.):
         val_loss, val_accuracy = evaluate(model, data_manager.get_torch_iterator(data_subset=VAL), criterion)
         print(f"Epoch {ep+1}: Train loss {train_loss:.4f}, Train acc {train_accuracy:.4f}, Val loss {val_loss:.4f}, Val acc {val_accuracy:.4f}")
 
+        train_accuracies.append(train_accuracy)
+        val_accuracies.append(val_accuracy)
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
 
-def train_log_linear_with_one_hot():
+    return train_accuracies, val_accuracies, train_losses, val_losses
+
+
+def test_model(model, data_manager):
+    """
+    Tests the given model with the regular subset & special subsets (rare words & negations)
+    """
+    # Testing the full subset
+    test_loss, test_accuracy = evaluate(model, data_manager.get_torch_iterator(data_subset=TEST))
+    print(f"Full Subset: Test loss {test_loss:.4f}, Test acc {test_accuracy:.4f}")
+
+    # Testing the negated polarity subset
+    negated_indices = data_loader.get_negated_polarity_examples(data_manager.sentences[TEST])
+    subest_sents = [data_manager.sentences[TEST][i] for i in negated_indices]
+    iterator = DataLoader(OnlineDataset(subest_sents, data_manager.sent_func, data_manager.sent_func_kwargs),
+                          batch_size=50, shuffle=False)
+    test_loss, test_accuracy = evaluate(model, iterator)
+    print(f"Negated Polarity: Test loss {test_loss:.4f}, Test acc {test_accuracy:.4f}")
+
+    # Testing the rare words subset
+    rare_indices = data_loader.get_rare_words_examples(data_manager.sentences[TEST])
+    subest_sents = [data_manager.sentences[TEST][i] for i in rare_indices]
+    iterator = DataLoader(OnlineDataset(subest_sents, data_manager.sent_func, data_manager.sent_func_kwargs),
+                          batch_size=50, shuffle=False)
+    test_loss, test_accuracy = evaluate(model, iterator)
+    print(f"Rare Words: Test loss {test_loss:.4f}, Test acc {test_accuracy:.4f}")
+
+
+def plot_results(experiment_name, train_accuracies, val_accuracies, train_losses, val_losses):
+    """
+    Plotting the training accuracies & validation accuracies on the same plot
+    Plotting the training losses & validation losses on the same plot
+
+    :param experiment_name: The name of the experiment, for saving the plots
+    """
+    epochs = range(1, len(train_accuracies) + 1) # Assuming the lengths are the same
+
+    plt.figure()
+    plt.plot(epochs, train_accuracies, label='Train')
+    plt.plot(epochs, val_accuracies, label='Validation')
+    plt.title('Accuracy')
+    plt.legend()
+    plt.savefig(f'{experiment_name}_accuracy.png')
+
+    plt.figure()
+    plt.plot(epochs, train_losses, label='Train')
+    plt.plot(epochs, val_losses, label='Validation')
+    plt.title('Loss')
+    plt.legend()
+    plt.savefig(f'{experiment_name}_loss.png')
+
+def save_results(experiment_name, train_accuracies, val_accuracies, train_losses, val_losses):
+    """
+    Save the results of the experiment to a pickle file
+    """
+    results = {
+        'train_accuracies': train_accuracies,
+        'val_accuracies': val_accuracies,
+        'train_losses': train_losses,
+        'val_losses': val_losses
+    }
+
+    save_pickle(results, f'{experiment_name}_results.pkl')
+
+def load_results(experiment_name):
+    """
+    Load the results of the experiment from a pickle file
+    """
+    return load_pickle(f'{experiment_name}_results.pkl')
+
+def train_log_linear_with_one_hot(load_pretrained=False):
     """
     Here comes your code for training and evaluation of the log linear model with one hot representation.
     """
@@ -444,12 +526,23 @@ def train_log_linear_with_one_hot():
     n_epochs = 20
 
     dm = DataManager(data_type=ONEHOT_AVERAGE, batch_size=batch_size)
-    model = LogLinear(dm.get_input_shape()[0])
-    model.to(device)
-    train_model(model, dm, n_epochs=n_epochs, lr=lr, weight_decay=weight_decay)
+    model = None
+    if load_pretrained:
+        model = LogLinear(dm.get_input_shape()[0])
+        model.load_state_dict(torch.load('log_linear_one_hot.pth'))
+    else:
+        model = LogLinear(dm.get_input_shape()[0])
+        model.to(device)
+        train_accuracies, val_accuracies, train_losses, val_losses = \
+            train_model(model, dm, n_epochs=n_epochs, lr=lr, weight_decay=weight_decay)
+        torch.save(model.state_dict(), 'log_linear_one_hot.pth')
+        save_results('log_linear_one_hot', train_accuracies, val_accuracies, train_losses, val_losses)
+        plot_results('log_linear_one_hot', train_accuracies, val_accuracies, train_losses, val_losses)
 
+    test_model(model, dm)
+    
 
-def train_log_linear_with_w2v():
+def train_log_linear_with_w2v(load_pretrained=False):
     """
     Here comes your code for training and evaluation of the log linear model with word embeddings
     representation.
@@ -462,12 +555,24 @@ def train_log_linear_with_w2v():
     embedding_dim = 300
 
     dm = DataManager(data_type=W2V_AVERAGE, batch_size=batch_size, embedding_dim=embedding_dim)
-    model = LogLinear(dm.get_input_shape()[0])
-    model.to(device)
-    train_model(model, dm, n_epochs=n_epochs, lr=lr, weight_decay=weight_decay)
+    model = None
+    if load_pretrained:
+        model = LogLinear(dm.get_input_shape()[0])
+        model.load_state_dict(torch.load('log_linear_w2v.pth'))
+    else:
+        model = LogLinear(dm.get_input_shape()[0])
+        model.to(device)
+        train_accuracies, val_accuracies, train_losses, val_losses = \
+            train_model(model, dm, n_epochs=n_epochs, lr=lr, weight_decay=weight_decay)
+        torch.save(model.state_dict(), 'log_linear_w2v.pth')
+            
+        save_results('log_linear_w2v', train_accuracies, val_accuracies, train_losses, val_losses)
+        plot_results('log_linear_one_hot', train_accuracies, val_accuracies, train_losses, val_losses)
+
+    test_model(model, dm)
 
 
-def train_lstm_with_w2v():
+def train_lstm_with_w2v(load_pretrained=False):
     """
     Here comes your code for training and evaluation of the LSTM model.
     """
@@ -484,12 +589,23 @@ def train_lstm_with_w2v():
     dropout = 0.5
 
     dm = DataManager(data_type=W2V_SEQUENCE, batch_size=batch_size, embedding_dim=embedding_dim)
-    model = LSTM(embedding_dim, hidden_dim, n_layers, dropout)
-    model.to(device)
-    train_model(model, dm, n_epochs=n_epochs, lr=lr, weight_decay=weight_decay)
+    model = None
+    if load_pretrained:
+        model = LSTM(embedding_dim, hidden_dim, n_layers, dropout)
+        model.load_state_dict(torch.load('lstm_w2v.pth'))
+    else:
+        model = LSTM(embedding_dim, hidden_dim, n_layers, dropout)
+        model.to(device)
+        train_accuracies, val_accuracies, train_losses, val_losses = \
+            train_model(model, dm, n_epochs=n_epochs, lr=lr, weight_decay=weight_decay)
+        torch.save(model.state_dict(), 'lstm_w2v.pth')
+        save_results('lstm_w2v', train_accuracies, val_accuracies, train_losses, val_losses)
+        plot_results('log_linear_one_hot', train_accuracies, val_accuracies, train_losses, val_losses)
+
+    test_model(model, dm)
 
 
 if __name__ == '__main__':
     # train_log_linear_with_one_hot()
-    # train_log_linear_with_w2v()
-    train_lstm_with_w2v()
+    train_log_linear_with_w2v()
+    # train_lstm_with_w2v()
