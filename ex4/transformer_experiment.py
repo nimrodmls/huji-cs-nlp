@@ -6,7 +6,6 @@ from exercise_blanks import device, test_model, plot_results
 import data_loader
 import numpy as np
 
-TOKENIZED = "tokenized"
 TRAIN = "train"
 VAL = "val"
 TEST = "test"
@@ -114,82 +113,6 @@ class DataManager():
         """
         return self.torch_datasets[TRAIN][0][0].shape
 
-
-def transformer_classification():
-
-    def train_epoch(model, data_iterator, optimizer, criterion):
-        """
-        Perform an epoch of training of the model with the optimizer
-        :param model:
-        :param data_loader:
-        :param optimizer:
-        :return: Average loss over the epoch
-        """
-        model.train()
-        total_loss = 0.
-        pred_correct = 0
-        # iterate over batches
-        for batch in tqdm(data_iterator):
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            labels = batch['labels'].to(device)
-
-            optimizer.zero_grad()
-            outputs = model(input_ids, attention_mask=attention_mask)
-            logits = outputs.logits.squeeze()
-            loss = criterion(logits, labels.to(torch.float32))
-            loss.backward()
-            optimizer.step()
-
-            preds = data_loader.get_sentiment_class_from_logits(logits)
-            pred_correct += (preds == labels).sum().item()
-            total_loss += loss.item()
-        
-        print(f"TRAIN Accuracy: {pred_correct / len(data_iterator.dataset)}")
-        return total_loss / len(data_iterator)
-
-    def evaluate_model(model, data_iterator):
-        model.eval()
-        pred_correct = 0
-        for batch in tqdm(data_iterator):
-            with torch.no_grad():
-                input_ids = batch['input_ids'].to(device)
-                attention_mask = batch['attention_mask'].to(device)
-                labels = batch['labels'].to(device)
-                
-                outputs = model(input_ids, attention_mask=attention_mask)
-                logits = outputs.logits.squeeze()
-
-                preds = data_loader.get_sentiment_class_from_logits(logits)
-                pred_correct += (preds == labels).sum().item()
-
-        print(f"VAL Accuracy: {pred_correct / len(data_iterator.dataset)}")
-
-    # Parameters
-    epochs = 2
-    batch_size = 64
-    learning_rate = 1e-5
-
-    # Model, tokenizer, and metric
-    model = AutoModelForSequenceClassification.from_pretrained(
-        'distilroberta-base', num_labels=1).to(device)
-    dm = DataManager(batch_size=batch_size)
-
-    # Weight decay is defaulted to 0 (as the exercise requires)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    criterion = torch.nn.BCEWithLogitsLoss().to(device)
-
-    val_accuracy = []
-    train_loss = []
-
-    for epoch in range(epochs):
-        print(f"[TRAIN] Epoch: {epoch + 1}")
-
-        loss = train_epoch(model, dm.get_torch_iterator(), optimizer, criterion)
-        train_loss.append(loss)
-
-        evaluate_model(model, dm.get_torch_iterator(data_subset=VAL))
-        # val_accuracy.append(metric.compute()['accuracy'])
 
 def train_epoch(model, data_iterator, optimizer, criterion):
     """
@@ -337,5 +260,9 @@ def transformer_experiment(load_pretrained=False):
 
     test_model(model, dm)
 
-# transformer_classification()
-transformer_experiment(load_pretrained=True)
+if __name__ == "__main__":
+    # Setting seeds for reproducibility
+    torch.manual_seed(42)
+    np.random.seed(42)
+
+    transformer_experiment(load_pretrained=False)

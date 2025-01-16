@@ -609,8 +609,11 @@ def lstm_with_w2v(load_pretrained=False):
 
     test_model(model, dm)
 
-
 if __name__ == '__main__':
-    # log_linear_with_one_hot()
-    log_linear_with_w2v(load_pretrained=True)
-    # lstm_with_w2v()
+    # Setting seeds for reproducibility
+    torch.manual_seed(42)
+    np.random.seed(42)
+
+    log_linear_with_one_hot(load_pretrained=False)
+    log_linear_with_w2v(load_pretrained=False)
+    lstm_with_w2v(load_pretrained=False)
