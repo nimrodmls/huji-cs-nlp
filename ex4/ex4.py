@@ -301,9 +301,6 @@ class LSTM(nn.Module):
         output, (h_n, c_n) = self.model(text)
         return self.linear(torch.hstack([h_n[0], h_n[1]])) # Passing concatenated output
 
-    def predict(self, text):
-        return
-
 
 class LogLinear(nn.Module):
     """
@@ -317,22 +314,8 @@ class LogLinear(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-    def predict(self, x):
-        return torch.argmax(self.forward(x), dim=1)
-
 
 # ------------------------- training functions -------------
-
-# TODO: This should probably be removed later
-def binary_accuracy(preds, y):
-    """
-    This method returns tha accuracy of the predictions, relative to the labels.
-    You can choose whether to use numpy arrays or tensors here.
-    :param preds: a vector of predictions
-    :param y: a vector of true labels
-    :return: scalar value - (<number of accurate predictions> / <number of examples>)
-    """
-    return (preds == y).sum().item() / len(y)
 
 
 def train_epoch(model, data_iterator, optimizer, criterion):
@@ -405,19 +388,6 @@ def evaluate(model, data_iterator, criterion=None):
         loss = accumulated_loss / len(data_iterator)
         
         return loss, accuracy
-
-
-def get_predictions_for_data(model, data_iter):
-    """
-
-    This function should iterate over all batches of examples from data_iter and return all of the models
-    predictions as a numpy ndarray or torch tensor (or list if you prefer). the prediction should be in the
-    same order of the examples returned by data_iter.
-    :param model: one of the models you implemented in the exercise
-    :param data_iter: torch iterator as given by the DataManager
-    :return:
-    """
-    return
 
 
 def train_model(model, data_manager, n_epochs, lr, weight_decay=0.):
