@@ -431,7 +431,7 @@ def train_model(model, data_manager, n_epochs, lr, weight_decay=0.):
     :param weight_decay: parameter for l2 regularization
     """
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.BCEWithLogitsLoss().to(device)
     
     train_accuracies, val_accuracies = [], []
     train_losses, val_losses = [], []
@@ -460,17 +460,17 @@ def test_model(model, data_manager):
 
     # Testing the negated polarity subset
     negated_indices = data_loader.get_negated_polarity_examples(data_manager.sentences[TEST])
-    subest_sents = [data_manager.sentences[TEST][i] for i in negated_indices]
-    iterator = DataLoader(OnlineDataset(subest_sents, data_manager.sent_func, data_manager.sent_func_kwargs),
-                          batch_size=50, shuffle=False)
+    subset_sents = [data_manager.sentences[TEST][i] for i in negated_indices]
+    iterator = DataLoader(OnlineDataset(subset_sents, data_manager.sent_func, data_manager.sent_func_kwargs),
+                          batch_size=64, shuffle=False)
     _, test_accuracy = evaluate(model, iterator)
     print(f"Negated Polarity Test Accuracy: {test_accuracy:.4f}")
 
     # Testing the rare words subset
     rare_indices = data_loader.get_rare_words_examples(data_manager.sentences[TEST], data_manager.sentiment_dataset)
-    subest_sents = [data_manager.sentences[TEST][i] for i in rare_indices]
-    iterator = DataLoader(OnlineDataset(subest_sents, data_manager.sent_func, data_manager.sent_func_kwargs),
-                          batch_size=50, shuffle=False)
+    subset_sents = [data_manager.sentences[TEST][i] for i in rare_indices]
+    iterator = DataLoader(OnlineDataset(subset_sents, data_manager.sent_func, data_manager.sent_func_kwargs),
+                          batch_size=64, shuffle=False)
     _, test_accuracy = evaluate(model, iterator)
     print(f"Rare Words Test Accuracy: {test_accuracy:.4f}")
 
@@ -517,7 +517,7 @@ def load_results(experiment_name):
     """
     return load_pickle(f'{experiment_name}_results.pkl')
 
-def train_log_linear_with_one_hot(load_pretrained=False):
+def log_linear_with_one_hot(load_pretrained=False):
     """
     Here comes your code for training and evaluation of the log linear model with one hot representation.
     """
@@ -545,7 +545,7 @@ def train_log_linear_with_one_hot(load_pretrained=False):
     test_model(model, dm)
     
 
-def train_log_linear_with_w2v(load_pretrained=False):
+def log_linear_with_w2v(load_pretrained=False):
     """
     Here comes your code for training and evaluation of the log linear model with word embeddings
     representation.
@@ -576,7 +576,7 @@ def train_log_linear_with_w2v(load_pretrained=False):
     test_model(model, dm)
 
 
-def train_lstm_with_w2v(load_pretrained=False):
+def lstm_with_w2v(load_pretrained=False):
     """
     Here comes your code for training and evaluation of the LSTM model.
     """
@@ -611,6 +611,6 @@ def train_lstm_with_w2v(load_pretrained=False):
 
 
 if __name__ == '__main__':
-    # train_log_linear_with_one_hot()
-    train_log_linear_with_w2v(load_pretrained=True)
-    # train_lstm_with_w2v()
+    # log_linear_with_one_hot()
+    log_linear_with_w2v(load_pretrained=True)
+    # lstm_with_w2v()
