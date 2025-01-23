@@ -1,5 +1,6 @@
 import wikipedia
 import spacy
+import itertools
 
 def get_relation_tokens(tokens):
     """
@@ -53,10 +54,46 @@ def pos_extractor(doc):
             
     return triplets
 
+def get_corresponding_compound(token):
+    """
+    Returns the corresponding compound token of the given token, with the token itself
+    """
+    return [child for child in token.children if child.dep_ == "compound"] + [token]
+
+def dependency_tree_extractor(doc):
+    """
+    An extractor based on the dependency tree of the given document.
+    """
+
+    propn_heads = []
+    for token in doc:
+        # Checking if the current token is a proper noun head
+        if token.pos_ == "PROPN" and token.dep_ != "compound":
+            propn_heads.append(token)
+    
+    triplets = []
+    for h1, h2 in itertools.combinations(propn_heads, 2):
+        # The first condition as defined in the exercise
+        if (h1.head == h2.head) and (h1.dep_ == "nsubj") and (h2.dep_ == "dobj"):
+            h1_compounds = get_corresponding_compound(h1)
+            h2_compounds = get_corresponding_compound(h2)
+            triplet = (h1_compounds, h1.head, h2_compounds)
+            triplets.append(triplet)
+        # The second condition as defined in the exercise
+        elif (h1.head == h2.head.head) and (h1.dep_ == "nsubj") and (h2.dep_ == "pobj") and (h2.head.dep_ == "prep"):
+            h1_compounds = get_corresponding_compound(h1)
+            h2_compounds = get_corresponding_compound(h2.head)
+            triplet = (h1_compounds, h1.head, h2_compounds)
+            triplets.append(triplet)
+
+
+    #return triplets
+
 if __name__ == "__main__":
     nlp = spacy.load("en_core_web_sm")
     wikipedia.set_lang("en")
     page = wikipedia.page('Natural Language Processing')
     doc = nlp(page.content)
 
-    pos_extractor(doc)
+    # pos_extractor(doc)
+    dependency_tree_extractor(doc)
