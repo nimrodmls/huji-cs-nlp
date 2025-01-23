@@ -1,0 +1,53 @@
+--- Evaluating page: Donald Trump ---
+POS extractor triplets: 237
+Dependency Tree extractor triplets: 67
+
+POS extractor random sample:
+(Trump, [announced, in], December)
+(U.S., [seek, of], Taliban)
+(Middle East, [=], Israel)
+(Scott Pruitt, [resigned, in], Secretary)
+(February, [asserted, in], U.S.)
+
+Dependency Tree extractor random sample:
+([Trump], [opened, at], [Trump, Plaza])
+([Republican, National, Convention], [nominated, with], [Senator, JD, Vance])
+([Trump], [spoke, to], [president, Recep, Tayyip, Erdoğan])
+([Cohn], [introduced], [consultant, Roger, Stone])
+([United, States], [became, in], [July])
+
+--- Evaluating page: Ruth Bader Ginsburg ---
+POS extractor triplets: 171
+Dependency Tree extractor triplets: 58
+
+POS extractor random sample:
+(Supreme Court, [honored], Ginburg)
+(Ginsburg, [advocated, of, shape], U.S.)
+(Ginsburg, [authored, in, as], United States)
+(Palmieri, [give], Ginsburg)
+(Ginsburg, [expressed, for], MeToo)
+
+Dependency Tree extractor random sample:
+([Ginsburg], [received, from], [Scribes])
+([Ginsburg], [received], [Achievement, Award])
+([Ginsburg], [criticized], [nominee, Donald, Trump])
+([Ginsburg], [died, in], [September])
+([Ruth], [attended], [James, Madison, High, School])
+
+--- Evaluating page: J.K. Rowling ---
+POS extractor triplets: 122
+Dependency Tree extractor triplets: 36
+
+POS extractor random sample:
+(Ford Anglia, [provided, from, for], Harris)
+(Harry Potter, [attends], Hogwarts)
+(Rowling, [finished, of], Harry Potter)
+(Harry, [assumes, in], Quirrell)
+(Christopher Little Literary Agency, [agreed, represent], Rowling)
+
+Dependency Tree extractor random sample:
+([Rowling], [returned], [Ripple])
+([Harry], [escapes], [Dursleys])
+([Bloomsbury], [published], [Stone])
+([Arantes], [returned, to], [Portugal])
+([Harry, Potter], [premiered, in], [May])
