@@ -3,12 +3,27 @@ import wikipedia
 import spacy
 import itertools
 import random
-import google.generativeai as genai
+# import google.generativeai as genai
+from openai import OpenAI
 
-TRUMP_GEMINI_QUERY = """
-Using the text below, extract all of the triplets of text which correspond to the template of (Subject, Relation, Object) where the Subject and Object slot fillers are names (proper nouns), and the Relation slot filler is a verb or a verb along with a preposition
-Starting in 1968, Trump was employed at his father's real estate company, Trump Management, which owned racially segregated middle-class rental housing in New York City's outer boroughs.[9][10] In 1971, his father made him president of the company and he began using the Trump Organization as an umbrella brand.[11] Roy Cohn was Trump's fixer, lawyer, and mentor for 13 years in the 1970s and 1980s.[12] In 1973, Cohn helped Trump countersue the U.S. government for $100 million (equivalent to $686 million in 2023)[13] over its charges that Trump's properties had racial discriminatory practices. Trump's counterclaims were dismissed, and the government's case was settled with the Trumps signing a consent decree agreeing to desegregate.[14] Helping Trump projects, Cohn was a consigliere whose Mafia connections controlled construction unions.[15] Cohn introduced political consultant Roger Stone to Trump, who enlisted Stone's services to deal with the federal government.[16] Between 1991 and 2009, he filed for Chapter 11 bankruptcy protection for six of his businesses: the Plaza Hotel in Manhattan, the casinos in Atlantic City, New Jersey, and the Trump Hotels & Casino Resorts company.[17]
-"""
+def openai_query(content):
+    """
+    """
+    client = OpenAI()
+    completion = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+        {
+            "role": "system", 
+            "content": "Using the following text from wikipedia, count all of the triplets of text which correspond to the template of (Subject, Relation, Object) where the Subject and Object slot fillers are names (proper nouns), and the Relation slot filler is a verb or a verb along with a preposition, and choose 5 random triplets to present and present the number of total triplets found."
+        },
+        {
+            "role": "user",
+            "content": f"{content}"
+        }]
+    )
+
+    return completion.choices[0].message.content
 
 def gemini_query(prompt: str):
     """
@@ -16,7 +31,7 @@ def gemini_query(prompt: str):
     and returns the response
     """
     # NOTE: The API key has been omitted for security reasons
-    genai.configure(api_key="")
+    genai.configure(api_key="AIzaSyBSr7dMPcTDXxrXCKjiSV581rU2tA3HOn4")
     model = genai.GenerativeModel("gemini-1.5-flash")
     return model.generate_content(prompt).parts[0].text
 
@@ -136,10 +151,17 @@ def wikipedia_pages_evaluation(pages: List[str]):
         evaluate_extractors(doc)
 
 def main():
-    # pages = ["Donald Trump", "Ruth Bader Ginsburg", "J.K. Rowling"]
+    pages = ["Donald Trump", "Ruth Bader Ginsburg", "J.K. Rowling"]
     # wikipedia_pages_evaluation(pages)
 
-    response = gemini_query(TRUMP_GEMINI_QUERY)
+    wiki_links = [
+        "https://en.wikipedia.org/wiki/Donald_Trump",
+        "https://en.wikipedia.org/wiki/Ruth_Bader_Ginsburg",
+        "https://en.wikipedia.org/wiki/J._K._Rowling"]
+    for page in pages:
+        print("\n --- Evaluating link using LLM: ---")
+        response = openai_query(wikipedia.page(page).content)
+        print(response)
 
 if __name__ == "__main__":
     main()
