@@ -31,7 +31,7 @@ def gemini_query(prompt: str):
     and returns the response
     """
     # NOTE: The API key has been omitted for security reasons
-    genai.configure(api_key="AIzaSyBSr7dMPcTDXxrXCKjiSV581rU2tA3HOn4")
+    genai.configure(api_key="")
     model = genai.GenerativeModel("gemini-1.5-flash")
     return model.generate_content(prompt).parts[0].text
 
